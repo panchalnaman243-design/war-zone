@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#04090c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' capacitor: https://localhost; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ws: wss:; media-src 'self' data: blob:">
+<title>WAR ZONE</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="loading">
+    <div class="logo big">WAR<span>ZONE</span></div>
+    <div class="loadBar"><div id="loadFill"></div></div>
+    <div class="muted" id="loadText">LOADING ASSETS...</div>
+</div>
+
+<div id="rotateHint"><div>📱↻</div><p>Rotate your device to landscape</p></div>
+
+<!-- ======================= AUTH ======================= -->
+<section id="auth" class="screen hidden">
+    <div class="authCard">
+        <div class="logo">WAR<span>ZONE</span></div>
+        <p class="muted center">SURVIVE THE WAVES</p>
+        <div class="field"><label for="authId">PLAYER ID</label>
+            <input id="authId" maxlength="16" autocomplete="username" autocapitalize="characters" spellcheck="false" placeholder="e.g. RAVI"></div>
+        <div class="field"><label for="authPw">PASSWORD</label>
+            <input id="authPw" type="password" maxlength="32" autocomplete="current-password" placeholder="min 4 characters"></div>
+        <div class="row">
+            <button id="loginBtn" class="primary">LOGIN</button>
+            <button id="registerBtn" class="ghost">CREATE ACCOUNT</button>
+        </div>
+        <div id="authMsg" class="authMsg"></div>
+        <p class="tiny center">Progress is saved on this device.</p>
+    </div>
+</section>
+
+<!-- ======================= HOME ======================= -->
+<section id="home" class="screen hidden">
+    <header class="topbar">
+        <div class="logo small">WAR<span>ZONE</span></div>
+        <div class="chips">
+            <div class="chip gold"><i>🪙</i><b id="coinsView">0</b></div>
+            <div class="chip"><i>⭐</i><b>LV <span id="levelView">1</span></b></div>
+            <button id="settingsBtn" class="iconBtn" aria-label="Settings">⚙</button>
+            <button id="logoutBtn" class="iconBtn" aria-label="Logout">⏻</button>
+        </div>
+    </header>
+
+    <main class="homeGrid">
+        <aside class="panel">
+            <h3>PLAYER</h3>
+            <div class="pName" id="playerNameView">-</div>
+            <div class="xpBar"><div id="xpFill"></div></div>
+            <div class="tiny muted" id="xpText"></div>
+            <div class="stat"><span>BEST SCORE</span><b id="bestView">0</b></div>
+            <div class="stat"><span>BEST WAVE</span><b id="waveView">1</b></div>
+            <div class="stat"><span>TOTAL KILLS</span><b id="killsView">0</b></div>
+            <h3 style="margin-top:14px">MISSION</h3>
+            <div id="missionMini" class="missionMini"></div>
+        </aside>
+
+        <div class="heroCol">
+            <div class="heroStage">
+                <canvas id="heroCanvas"></canvas>
+                <div class="heroInfo">
+                    <div class="heroName" id="heroName">CIVILIAN</div>
+                    <div class="heroGun" id="heroGun">PISTOL</div>
+                </div>
+            </div>
+            <button id="playBtn" class="primary play">▶ PLAY</button>
+            <div class="navRow">
+                <button id="shopBtn">🛒 SHOP</button>
+                <button id="missionsBtn">🎯 MISSIONS</button>
+                <button id="mapsBtn">🗺 MAPS</button>
+                <button id="rewardBtn">🎁 DAILY</button>
+                <button id="giftBtn">💝 GIFT</button>
+                <button id="multiBtn">🌐 ONLINE</button>
+                <button id="helpBtn">❓ HELP</button>
+                <button id="adminBtn" class="hidden">🛠 ADMIN</button>
+            </div>
+        </div>
+
+        <aside class="panel">
+            <h3>LEADERBOARD <span class="tiny muted">(this device)</span></h3>
+            <div id="boardList"></div>
+        </aside>
+    </main>
+</section>
+
+<!-- ======================= GAME ======================= -->
+<section id="game" class="screen hidden">
+    <canvas id="gameCanvas"></canvas>
+    <div id="touchLayer"></div>
+
+    <div id="hud">
+        <div class="hudBox tl"><span>SCORE</span><b id="hudScore">0</b></div>
+        <div class="hudBox tr"><span>WAVE</span><b id="hudWave">1</b></div>
+        <div class="hudBox tc"><span>🪙</span><b id="hudCoins">0</b></div>
+        <button id="pauseBtn" class="pauseBtn" aria-label="Pause">❚❚</button>
+
+        <div class="hpBox">
+            <div class="hpText" id="hpText">HEALTH 100/100</div>
+            <div class="hpBar"><div id="hpFill"></div></div>
+        </div>
+
+        <div class="powerBox">
+            <div class="powerText" id="powerText">POWER 0%</div>
+            <div class="powerBar"><div id="powerFill"></div></div>
+            <div class="stockRow" id="stockView"></div>
+        </div>
+        <button id="serumBtn" class="serumBtn" aria-label="Drink serum">⚗<small>SERUM</small></button>
+
+        <div class="ammoBox" id="ammoBox">
+            <img id="hudGun" alt="" draggable="false">
+            <div class="ammoNums"><b id="ammoNow">0</b><span id="ammoRes">/ 0</span></div>
+            <div class="tiny" id="hudGunName">PISTOL</div>
+            <div class="reloadWrap" id="reloadWrap"><div id="reloadFill"></div></div>
+            <div class="reloadHint">R = RELOAD</div>
+        </div>
+        <button id="reloadBtn" class="reloadBtn" aria-label="Reload">⟳<small>RELOAD</small></button>
+    </div>
+
+    <div id="stickL" class="stick"><div class="ring"></div><div class="knob"></div></div>
+    <div id="stickR" class="stick aim"><div class="ring"></div><div class="knob"></div></div>
+    <div id="banner"></div>
+    <div id="hurtFx"></div>
+
+    <div id="pauseOverlay" class="overlay hidden">
+        <div class="overCard">
+            <h2>PAUSED</h2>
+            <button id="resumeBtn" class="primary">▶ RESUME</button>
+            <button id="pauseSettingsBtn" class="ghost">⚙ SETTINGS</button>
+            <button id="quitBtn" class="danger">✖ QUIT TO MENU</button>
+        </div>
+    </div>
+
+    <div id="overOverlay" class="overlay hidden">
+        <div class="overCard">
+            <h2 class="red">YOU DIED</h2>
+            <div class="overGrid">
+                <div><span>SCORE</span><b id="overScore">0</b></div>
+                <div><span>BEST</span><b id="overBest">0</b></div>
+                <div><span>WAVE</span><b id="overWave">1</b></div>
+                <div><span>KILLS</span><b id="overKills">0</b></div>
+                <div class="wide"><span>COINS EARNED</span><b id="overCoins">0</b></div>
+            </div>
+            <button id="againBtn" class="primary">↻ PLAY AGAIN</button>
+            <button id="homeBtn" class="ghost">⌂ MAIN MENU</button>
+        </div>
+    </div>
+
+    <!-- PUZZLE OVERLAY (shown between waves every 3rd wave) -->
+    <div id="puzzleOverlay" class="overlay hidden"></div>
+
+    <!-- SERUM active HUD badge -->
+    <div id="serumHud" class="hidden">
+        <b>⚗ SERUM ACTIVE</b>
+        <span id="serumTimer">30s</span>
+    </div>
+</section>
+
+<!-- ======================= MODAL ======================= -->
+<div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modalCard" id="modalCard">
+        <div class="modalHead"><h2 id="modalTitle"></h2><button id="modalClose" class="iconBtn" aria-label="Close">✕</button></div>
+        <div class="modalBody" id="modalBody"></div>
+    </div>
+</div>
+<div id="toast"></div>
+
+<script src="js/art-meta.js"></script>
+<script src="js/config.js"></script>
+<script src="js/core.js"></script>
+<script src="js/sprites.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/online.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
