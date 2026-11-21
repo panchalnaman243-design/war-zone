@@ -1,0 +1,5 @@
+Copyright (c) 2026 [YOUR NAME / STUDIO]. All rights reserved.
+
+The source code and art in this repository are proprietary. Third-party components:
+- Capacitor (MIT) - https://github.com/ionic-team/capacitor
+- ws (MIT) - https://github.com/websockets/ws

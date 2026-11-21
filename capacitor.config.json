@@ -1,0 +1,19 @@
+{
+  "appId": "com.yourstudio.warzone",
+  "appName": "WAR ZONE",
+  "webDir": "dist",
+  "backgroundColor": "#04090c",
+  "server": { "androidScheme": "https" },
+  "android": { "allowMixedContent": false },
+  "ios": { "contentInset": "never", "backgroundColor": "#04090c" },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "launchAutoHide": true,
+      "backgroundColor": "#04090c",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP"
+    },
+    "StatusBar": { "style": "DARK", "backgroundColor": "#04090c", "overlaysWebView": true }
+  }
+}

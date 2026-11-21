@@ -1,0 +1,32 @@
+{
+  "name": "warzone",
+  "version": "1.0.0",
+  "description": "WAR ZONE - zombie survival shooter (HTML5 + Capacitor for Android / iOS)",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/dev-server.js",
+    "art": "python scripts/process_art.py",
+    "build": "node scripts/build.js dev",
+    "build:release": "node scripts/build.js release",
+    "assets": "capacitor-assets generate --assetPath resources --iconBackgroundColor #04090c --splashBackgroundColor #04090c",
+    "cap:add:android": "cap add android",
+    "cap:add:ios": "cap add ios",
+    "sync": "npm run build:release && cap sync",
+    "android": "npm run sync && cap open android",
+    "ios": "npm run sync && cap open ios",
+    "server": "node server/server.js"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/app": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/haptics": "^7.0.0",
+    "@capacitor/ios": "^7.0.0",
+    "@capacitor/splash-screen": "^7.0.0",
+    "@capacitor/status-bar": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.0.0"
+  }
+}
