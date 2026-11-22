@@ -144,7 +144,15 @@ handlers.GLOBAL_LEADERBOARD = m => {
     if(WZ.ui && WZ.ui.renderLeaderboard) WZ.ui.renderLeaderboard(m.players || []);
 };
 handlers.REGISTERED = () => say("Account created. Now log in.", true);
-handlers.AUTHED = m => { net.acct = m.id; net.wallet = m.coins; render(); };
+handlers.AUTHED = m => {
+    net.acct = m.id; net.wallet = m.coins; render();
+    const u = WZ.ui.currentUser();
+    if(u && Array.isArray(m.titles)){
+        let changed = false;
+        m.titles.forEach(id=>{ if(WZ.TITLES.some(t=>t.id===id) && !u.titles.includes(id)){ u.titles.push(id); changed=true; } });
+        if(changed) WZ.ui.saveUser(u);
+    }
+};
 handlers.JOINED = m => { net.code = m.code; net.playerId = m.playerId; net.host = m.host; render(); };
 handlers.LOBBY = m => {
     net.code = m.code; net.host = m.host === net.acct; net.lobby = m.players;
@@ -156,7 +164,7 @@ handlers.DUEL_FOUND = m => {
     net.duelQueue = false; net.duel = true; net.inMatch = true;
     net.playerId = m.playerId; net.duelId = m.duelId;
     WZ.ui.closeModal();
-    WZ.ui.startOnlineGame({ duel:true, duelId:m.duelId, playerId:m.playerId });
+    WZ.ui.startOnlineGame({ duel:true, duelId:m.duelId, playerId:m.playerId, account:net.acct, wallet:net.wallet });
 };
 handlers.DUEL_STATE = m => WZ.game.onNet(m.s);
 handlers.DUEL_ROUND_OVER = m => WZ.game.onDuelRound(m);
