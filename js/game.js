@@ -199,7 +199,7 @@ function start(user, online){
         puzzlePending: false, puzzleDone: false
     };
     G.map = WZ.MAPS[user.currentMap] || WZ.MAPS.city;
-    G.online = online ? { code: online.code, playerId: online.playerId, lastMove: 0, hp: undefined } : null;
+    G.online = online ? { code: online.code, playerId: online.playerId, lastMove: 0, hp: undefined, hasState:false } : null;
     G.duel = !!(online && online.duel); G.onlineWallet = online && Number(online.wallet) || 0; G.duelWins = [];
     G.remote = [];
     G.maxHp = G.online ? 100 : ch.health + upg("iron_heart") * 10;   // online: server uses 100 hp
@@ -1324,7 +1324,8 @@ function onNet(s){
         }
         G.online.hp = me.hp;
         G.hp = me.hp; G.ammo = me.ammo;
-        if(G.duel && s.round !== previousRound){ G.player.x = netX(me.x); G.player.y = netY(me.y); G.player.facing = me.facing; }
+        if(G.duel && (!G.online.hasState || s.round !== previousRound)){ G.player.x = netX(me.x); G.player.y = netY(me.y); G.player.facing = me.facing; }
+        if(G.duel) G.online.hasState = true;
     }
     G.remote = s.players.filter(p => p.id !== myId).map(p => ({
         id: p.id, name: p.name, character: p.character, skin: p.skin,
@@ -1370,7 +1371,7 @@ function onDuelOver(m){
     $("overScore").textContent = my ? my.wins : 0;
     $("overBest").parentElement.querySelector("span").textContent = "ONLINE WALLET";
     $("overBest").textContent = WZ.fmt(G.onlineWallet);
-    $("overWave").textContent = "4";
+    $("overWave").textContent = m.roundsPlayed || 4;
     $("overKills").textContent = other ? other.wins : 0;
     $("overCoins").textContent = m.bonus || 0;
     $("overOverlay").querySelector(".overGrid .wide span").textContent = "MATCH BONUS";
