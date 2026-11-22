@@ -6,7 +6,7 @@
 (function(){
 const WZ = window.WZ, CFG = WZ.CONFIG, $ = WZ.$;
 
-const net = { ws: null, acct: null, wallet: 0, code: null, playerId: null, host: false, lobby: [], inMatch: false };
+const net = { ws: null, acct: null, wallet: 0, code: null, playerId: null, host: false, lobby: [], inMatch: false, duelQueue: false, duel: false };
 const globalSyncKeys = new Map();
 let lastLeaderboardRequest = 0;
 const handlers = {};
@@ -58,7 +58,7 @@ function connect(then){
     };
     ws.onerror = () => say("Cannot reach the server. Is it running?");
     ws.onclose = () => {
-        net.ws = null; net.acct = null; net.code = null; net.inMatch = false; globalSyncKeys.clear(); lastLeaderboardRequest = 0;
+        net.ws = null; net.acct = null; net.code = null; net.inMatch = false; net.duelQueue = false; net.duel = false; globalSyncKeys.clear(); lastLeaderboardRequest = 0;
         if(WZ.game.running){ WZ.toast("Connection lost", "bad"); WZ.game.quit(); }
         else if(WZ.ui.modalOpen()) say("Disconnected from the server.");
     };
@@ -78,7 +78,9 @@ function loginView(){
 
 function roomView(){
     return `<div class="infoCard"><h3>ONLINE WALLET</h3><p>🪙 <b>${WZ.fmt(net.wallet)}</b> &nbsp;·&nbsp; ${WZ.esc(net.acct)}</p></div>
-        <button class="primary claim" data-on="create">CREATE ROOM</button>
+        <div class="infoCard"><h3>⚔ ONLINE 1v1</h3><p>Fight another player from any device. No zombies. Four rounds. First to 3 round wins takes the match.</p><p>Round win: +10 coins · Round loss: +5 coins · Match win: +50 bonus coins.</p></div>
+        <button class="primary claim" data-on="duel">⚔ FIND 1v1 MATCH</button>
+        <button class="primary claim" data-on="create">CREATE CO-OP ROOM</button>
         <div class="field" style="margin-top:12px"><label for="onCode">ROOM CODE</label>
             <input id="onCode" maxlength="6" autocapitalize="characters" spellcheck="false"></div>
         <button class="claim" data-on="join">JOIN ROOM</button>
@@ -96,8 +98,10 @@ function lobbyView(){
 }
 
 function render(){
-    const view = !net.acct ? loginView() : !net.code ? roomView() : lobbyView();
-    WZ.openModal("ONLINE CO-OP", view);
+    const view = !net.acct ? loginView() : net.duelQueue
+        ? `<div class="infoCard"><h3>SEARCHING FOR 1v1 OPPONENT...</h3><p>Keep this screen open. We will match you with a player on another device.</p></div><button class="ghost claim" data-on="duelCancel">CANCEL SEARCH</button><div id="onMsg" class="authMsg"></div>`
+        : !net.code ? roomView() : lobbyView();
+    WZ.openModal("ONLINE", view);
 }
 
 /* ---------- button actions ---------- */
@@ -107,6 +111,14 @@ function act(a){
         const id = ($("onId").value || "").trim(), pw = $("onPw").value || "";
         if(!id || !pw) return say("Enter an ID and a password.");
         connect(() => send({ type: a === "login" ? "LOGIN" : "REGISTER", id, pw }));
+    }
+    else if(a === "duel"){
+        const u = WZ.ui.currentUser();
+        net.duelQueue = true; render();
+        send({ type:"DUEL_QUEUE", character:u.character, skin:WZ.activeSkin(u) });
+    }
+    else if(a === "duelCancel"){
+        send({ type:"DUEL_CANCEL" }); net.duelQueue = false; render();
     }
     else if(a === "create"){
         send({ type: "CREATE_ROOM", character: u.character, skin: WZ.activeSkin(u) });
@@ -137,6 +149,20 @@ handlers.JOINED = m => { net.code = m.code; net.playerId = m.playerId; net.host 
 handlers.LOBBY = m => {
     net.code = m.code; net.host = m.host === net.acct; net.lobby = m.players;
     if(!net.inMatch) render();
+};
+handlers.DUEL_QUEUED = m => say(m.message || "Searching for an opponent...");
+handlers.DUEL_CANCELLED = () => { net.duelQueue = false; render(); };
+handlers.DUEL_FOUND = m => {
+    net.duelQueue = false; net.duel = true; net.inMatch = true;
+    net.playerId = m.playerId; net.duelId = m.duelId;
+    WZ.ui.closeModal();
+    WZ.ui.startOnlineGame({ duel:true, duelId:m.duelId, playerId:m.playerId });
+};
+handlers.DUEL_STATE = m => WZ.game.onNet(m.s);
+handlers.DUEL_ROUND_OVER = m => WZ.game.onDuelRound(m);
+handlers.DUEL_OVER = m => {
+    net.inMatch = false; net.duel = false; net.wallet = m.wallet || net.wallet;
+    WZ.game.onDuelOver(m);
 };
 handlers.MATCH_START = () => {
     net.inMatch = true;
@@ -172,7 +198,8 @@ WZ.online = {
     syncGlobalUser,
     refreshLeaderboard,
     get inMatch(){ return net.inMatch; },
-    get wallet(){ return net.wallet; }
+    get wallet(){ return net.wallet; },
+    get inDuel(){ return net.duel; }
 };
 WZ.online.init();
 })();
