@@ -1311,6 +1311,7 @@ function newNetZombie(z){
 function onNet(s){
     if(!G || !G.online) return;
     const myId = G.online.playerId;
+    const previousRound = G.wave;
     G.wave = s.round || s.wave || G.wave; G.need = s.maxRounds || s.need || 4; G.killsWave = s.killsWave || 0;
     if(s.wins) G.duelWins = s.wins;
     const me = s.players.find(p => p.id === myId);
@@ -1323,6 +1324,7 @@ function onNet(s){
         }
         G.online.hp = me.hp;
         G.hp = me.hp; G.ammo = me.ammo;
+        if(G.duel && s.round !== previousRound){ G.player.x = netX(me.x); G.player.y = netY(me.y); G.player.facing = me.facing; }
     }
     G.remote = s.players.filter(p => p.id !== myId).map(p => ({
         id: p.id, name: p.name, character: p.character, skin: p.skin,
@@ -1345,7 +1347,7 @@ function onDuelRound(m){
     G.duelWins = m.wins || G.duelWins;
     const mine = (m.wallets || []).find(p=>p.id === G.online.playerId);
     if(mine) G.onlineWallet = mine.coins;
-    const text = m.winner ? (m.winner === G.user.id ? "ROUND WON · +10 COINS" : "ROUND LOST · +5 COINS") : "ROUND DRAW · +5 COINS EACH";
+    const text = m.winner ? (m.winner === G.online.account ? "ROUND WON · +10 COINS" : "ROUND LOST · +5 COINS") : "ROUND DRAW · +5 COINS EACH";
     banner(text); hud(true);
 }
 function onDuelOver(m){
