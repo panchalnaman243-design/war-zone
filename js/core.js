@@ -58,6 +58,9 @@ WZ.normalizeUser = function(u){
     if(!u.ownedCharacters.includes("civilian")) u.ownedCharacters.push("civilian");
     u.upgrades = u.upgrades && typeof u.upgrades === "object" ? u.upgrades : {};
     u.missionIndex = WZ.safeInt(u.missionIndex); u.missionProgress = WZ.safeInt(u.missionProgress);
+    u.puzzlesSolved = WZ.safeInt(u.puzzlesSolved); u.bossKills = WZ.safeInt(u.bossKills);
+    u.titles = Array.isArray(u.titles) ? u.titles.filter(t => WZ.TITLES.some(x => x.id === t)) : [];
+    u.title = u.titles.includes(u.title) ? u.title : null;
     u.claimedMissions = Array.isArray(u.claimedMissions) ? u.claimedMissions : [];
     // skins
     u.ownedSkins = Array.isArray(u.ownedSkins) ? u.ownedSkins.filter(s => WZ.SKINS[s]) : [];
@@ -201,3 +204,13 @@ const Sfx = WZ.sfx = {
     window.addEventListener(ev, () => Sfx.resume(), { passive: true }));
 document.addEventListener("click", e => { if(e.target.closest && e.target.closest("button")) Sfx.click(); }, true);
 })();
+
+/* Awards every title the player now qualifies for. Returns the newly earned ones. */
+WZ.checkTitles = function(u){
+    const earned = [];
+    for(const t of WZ.TITLES){
+        if(!u.titles.includes(t.id) && t.test(u)){ u.titles.push(t.id); earned.push(t); }
+    }
+    if(!u.title && u.titles.length) u.title = u.titles[u.titles.length - 1];
+    return earned;
+};

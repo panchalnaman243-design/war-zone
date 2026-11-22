@@ -12,6 +12,7 @@ let heroRaf = 0, shopTab = "characters", shopWeapon = "pistol";
 function show(id){ ["auth", "home", "game"].forEach(s => $(s).classList.toggle("hidden", s !== id)); }
 /* "Candidate" check only - matching one of ADMIN_IDS is not enough on its own, see openAdmin(). */
 const isAdmin = () => CFG.BUILD === "dev" && user && CFG.ADMIN_IDS.includes(user.id);
+WZ.cheats = { god: false };   // dev-only toggles set from the admin terminal
 let adminUnlocked = false;   // resets on every reload - never persisted, never saved to the user record
 
 /* ---------------------------------------------------------
@@ -45,6 +46,7 @@ async function doAuth(create){
     }else{
         const u = users[id];
         if(!u) return authMsg("Player not found. Create an account first.");
+        if(u.banned) return authMsg("This account is banned on this device.");
         if(u.pw){ if(u.pw !== hash) return authMsg("Wrong password."); }
         else{   // migrate a legacy plain-text save
             if(String(u.password) !== pw) return authMsg("Wrong password.");
@@ -85,6 +87,8 @@ function updateHome(){
     $("coinsView").textContent = fmt(u.coins);
     $("levelView").textContent = u.level;
     $("playerNameView").textContent = u.id;
+    const tt = WZ.TITLES.find(t => t.id === u.title);
+    $("titleView").textContent = tt ? "◆ " + tt.name : "NO TITLE (tap to choose)";
     $("xpFill").style.width = Math.min(100, u.xp / (u.level * 100) * 100) + "%";
     $("xpText").textContent = `XP ${u.xp} / ${u.level * 100}`;
     $("bestView").textContent = fmt(u.bestScore);
@@ -135,6 +139,20 @@ ui.modalOpen = () => !$("modal").classList.contains("hidden");
 /* ---------------------------------------------------------
    LEVEL SELECT (arenas)
 --------------------------------------------------------- */
+function openTitles(){
+    const u = user;
+    const rows = WZ.TITLES.map(t => {
+        const got = u.titles.includes(t.id), on = u.title === t.id;
+        const action = !got ? `<button class="shopAction" disabled>LOCKED</button>`
+            : on ? `<button class="shopAction on">EQUIPPED</button>`
+            : `<button class="shopAction equip" data-act="titleEquip" data-arg="${t.id}">EQUIP</button>`;
+        return `<div class="shopItem ${on ? "equipped" : ""}"><div class="itemName">${t.name}</div>
+            <div class="itemDesc">${t.desc}</div>${action}</div>`;
+    }).join("");
+    openModal("TITLES", `<p class="tiny muted">Titles unlock as you play. Equip one to show it under your name.</p>
+        <div class="shopGrid">${rows}</div>`, true);
+}
+
 function openMaps(){
     const u = user, cur = WZ.MAPS[u.currentMap] || WZ.MAPS.city;
     const cards = WZ.MAP_ORDER.map(id => {
@@ -296,6 +314,106 @@ ui.openSettings = function(){
    you set yourself in config.js -> ADMIN_PASSCODE_HASH, not by
    the username. See CONFIG's comment for how to set it.)
 --------------------------------------------------------- */
+/* ---------- admin terminal: fixed commands only (no eval, no arbitrary code) ---------- */
+const TERM_HELP = [
+    "/help                show this list",
+    "/coins <n>           add n coins to my account (1 - 1000000)",
+    "/give <ID> <n>       send n coins to another local player",
+    "/unlock              unlock every character, gun and skin",
+    "/maxupg              set every upgrade to level 10",
+    "/stats               my level, coins and best score",
+    "/players             list local players",
+    "/ban <ID>            block an account from logging in on this device",
+    "/unban <ID>          allow a banned account to log in again",
+    "/login <ID>          switch to an account WITHOUT a password (dev only)",
+    "/blur [on|off]       blur the whole screen (toggle if no argument)",
+    "/god [on|off]        infinite health in offline games (toggle if no argument)",
+    "/clear               clear the terminal"
+];
+
+function termRun(line){
+    const parts = String(line || "").trim().split(/\s+/);
+    const cmd = (parts[0] || "").replace(/^\//, "").toLowerCase(), args = parts.slice(1);
+    const out = [];
+    if(!cmd) return out;
+    if(cmd === "help") return TERM_HELP.slice();
+    if(cmd === "clear") return null;
+    if(cmd === "ban" || cmd === "unban"){
+        const id = WZ.normalizeId(args[0]);
+        if(!id) return [`usage: /${cmd} <ID>`];
+        const users = WZ.store.getUsers();
+        if(!users[id]) return [`no local player called ${id}`];
+        if(cmd === "ban"){
+            if(id === user.id) return ["you cannot ban yourself"];
+            if(CFG.ADMIN_IDS.includes(id)) return ["admin accounts cannot be banned"];
+            users[id].banned = true;
+        }else delete users[id].banned;
+        WZ.store.saveUsers(users);
+        return [cmd === "ban" ? `${id} is banned on this device` : `${id} is unbanned`];
+    }
+    if(cmd === "login"){
+        const id = WZ.normalizeId(args[0]);
+        if(!id) return ["usage: /login <ID>"];
+        const users = WZ.store.getUsers();
+        if(!users[id]) return [`no local player called ${id}`];
+        if(users[id].banned) return [`${id} is banned. Use /unban ${id} first`];
+        login(WZ.normalizeUser(users[id]));
+        ui.closeModal();
+        return null;
+    }
+    if(cmd === "blur"){
+        const on = args[0] === "off" ? false : args[0] === "on" ? true : !document.documentElement.classList.contains("fxBlur");
+        document.documentElement.classList.toggle("fxBlur", on);
+        return [`screen blur ${on ? "on" : "off"}`];
+    }
+    if(cmd === "god"){
+        const on = args[0] === "off" ? false : args[0] === "on" ? true : !WZ.cheats.god;
+        WZ.cheats.god = on;
+        return [`god mode ${on ? "on (offline games only)" : "off"}`];
+    }
+    if(cmd === "coins"){
+        const n = WZ.safeInt(args[0], -1);
+        if(n < 1 || n > 1000000) return ["usage: coins <1-1000000>"];
+        user.coins += n; ui.saveUser(); updateHome();
+        return [`+${fmt(n)} coins. Balance: ${fmt(user.coins)}`];
+    }
+    if(cmd === "give"){
+        const id = WZ.normalizeId(args[0]), n = WZ.safeInt(args[1], -1);
+        if(!id || n < 1 || n > 1000000) return ["usage: give <ID> <1-1000000>"];
+        const users = WZ.store.getUsers();
+        if(!users[id]) return [`no local player called ${id}`];
+        users[id].coins = WZ.safeInt(users[id].coins) + n;
+        WZ.store.saveUsers(users);
+        return [`sent ${fmt(n)} coins to ${id}`];
+    }
+    if(cmd === "unlock"){
+        user.ownedCharacters = Object.keys(WZ.CHARACTERS);
+        user.ownedWeapons = Object.keys(WZ.WEAPONS);
+        user.ownedSkins = Object.keys(WZ.SKINS);
+        ui.saveUser(); return ["everything unlocked"];
+    }
+    if(cmd === "maxupg"){
+        WZ.UPGRADES.forEach(u => user.upgrades[u.id] = 10);
+        ui.saveUser(); return ["all upgrades set to level 10"];
+    }
+    if(cmd === "stats"){
+        return [`${user.id}: level ${user.level}, coins ${fmt(user.coins)}, best score ${fmt(user.bestScore)}, kills ${fmt(user.kills || 0)}`];
+    }
+    if(cmd === "players"){
+        return Object.values(WZ.store.getUsers()).map(u => `${u.id}  LV ${u.level}  coins ${fmt(u.coins)}`);
+    }
+    return [`unknown command: ${cmd}  (type help)`];
+}
+
+function termPrint(lines){
+    const box = $("termOut"); if(!box) return;
+    if(lines === null){ box.innerHTML = ""; return; }
+    for(const l of lines){
+        const d = document.createElement("div"); d.textContent = l; box.appendChild(d);
+    }
+    box.scrollTop = box.scrollHeight;
+}
+
 function openAdmin(){
     if(!isAdmin()) return;
     if(!CFG.ADMIN_PASSCODE_HASH){
@@ -312,7 +430,19 @@ function openAdmin(){
         <button class="danger" data-act="adm" data-arg="reset">RESET</button></div></div>
         <div class="infoCard"><h3>PLAYERS (${users.length})</h3><table class="tbl"><tr><th>ID</th><th>LV</th><th>COINS</th><th>BEST</th></tr>
         ${users.map(u => `<tr><td>${esc(u.id)}</td><td>${u.level}</td><td>${fmt(u.coins)}</td><td>${fmt(u.bestScore)}</td></tr>`).join("")}</table></div>
+        <div class="infoCard"><h3>TERMINAL</h3>
+            <div id="termOut" class="termOut"></div>
+            <form id="termForm" class="termIn" autocomplete="off"><span>&gt;</span>
+                <input id="termIn" spellcheck="false" autocapitalize="off" placeholder="type a command, e.g. help"></form></div>
         <p class="tiny muted">This panel does not exist in release builds (npm run build:release / npm run android / npm run ios).</p>`);
+    termPrint(["WAR ZONE admin terminal. Type help for commands."]);
+    $("termForm").addEventListener("submit", e => {
+        e.preventDefault();
+        const inp = $("termIn"), line = inp.value; inp.value = "";
+        if(!line.trim()) return;
+        termPrint([`> ${line}`]);
+        termPrint(termRun(line));
+    });
 }
 
 function openAdminGate(){
@@ -333,6 +463,7 @@ const A = {
     mapSelect: id => { if(user.unlockedMaps.includes(id)){ user.currentMap = id; ui.saveUser(); openMaps(); } },
     mapBuy: id => { const m = WZ.MAPS[id]; if(m && !user.unlockedMaps.includes(id) && spend(m.price)){ user.unlockedMaps.push(id); user.currentMap = id; WZ.toast(m.name + " unlocked!", "good"); ui.saveUser(); openMaps(); } },
     mapPlay: () => { ui.closeModal(); ui.startGame(); },
+    titleEquip: id => { if(user.titles.includes(id)){ user.title = id; ui.saveUser(); updateHome(); openTitles(); } },
     charBuy: id => { const c = WZ.CHARACTERS[id]; if(spend(c.price)){ user.ownedCharacters.push(id); user.character = id; user.xp += 10; WZ.toast(c.name + " unlocked!", "good"); commit(); } },
     charEquip: id => { user.character = id; commit(); },
     weaponBuy: id => { const w = WZ.WEAPONS[id]; if(spend(w.price)){ user.ownedWeapons.push(id); user.weapon = id; user.xp += 10; WZ.toast(w.name + " unlocked!", "good"); commit(); } },
@@ -396,6 +527,7 @@ ui.boot = async function(){
     $("shopBtn").onclick = () => openShop();
     $("missionsBtn").onclick = openMissions;
     $("mapsBtn").onclick = openMaps;
+    $("titleView").onclick = openTitles;
     $("rewardBtn").onclick = openReward;
     $("giftBtn").onclick = openGift;
     $("multiBtn").onclick = openMulti;

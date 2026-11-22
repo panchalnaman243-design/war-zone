@@ -23,19 +23,20 @@ WZ.CONFIG = {
        To set a passcode: open the game, open the browser console (F12) and run
            await WZ.sha256("type-your-own-secret-phrase-here")
        then paste the hex string it prints below. The plain phrase is never stored in the code. */
-    ADMIN_PASSCODE_HASH: "",
+    ADMIN_PASSCODE_HASH: "ca96187bffa68bb9a336afabbc94636ac82dd62dcc2960d7c912c382687f1cf5",
 
     FEATURES: {
         multiplayer: true,       // online co-op (needs the server running, see CONFIG.ONLINE_URL)
         gifting: true,
-        dailyRewards: true
+        dailyRewards: true,
+        puzzles: false          // wave-end puzzles (and the POWER they give). Set true to bring them back
     },
 
     ECONOMY: {
         startCoins: 100,
-        waveCoinsMin: 3,         // original design: every wave = 3 or 4 coins
-        waveCoinsMax: 4,
-        coinPerKill: 0,          // raise this if you want a faster economy
+        waveCoinsMin: 10,        // coins per cleared wave
+        waveCoinsMax: 10,
+        coinPerKill: 0.5,        // coins per zombie killed (offline; fractions add up, whole coins are paid)
         xpPerKill: 2,
         ammoDropChance: 0.07,
         healthDropChance: 0.035
@@ -68,27 +69,27 @@ WZ.WEAPONS = {
         pellets: 1, spread: .035, pierce: 0, reloadMs: 900, recoil: 9, shake: 1.2, kb: 3
     },
     rifle: {
-        id: "rifle", name: "RIFLE", price: 1000,
+        id: "rifle", name: "RIFLE", price: 500,
         damage: 25, fireRate: 150, mag: 30, reserve: 180, speed: 17,
         pellets: 1, spread: .035, pierce: 0, reloadMs: 1300, recoil: 11, shake: 1.6, kb: 4
     },
     smg: {
-        id: "smg", name: "SMG", price: 10000,
+        id: "smg", name: "SMG", price: 5000,
         damage: 11, fireRate: 75, mag: 40, reserve: 240, speed: 18,
         pellets: 1, spread: .05, pierce: 0, reloadMs: 1200, recoil: 7, shake: 1.0, kb: 2
     },
     shotgun: {
-        id: "shotgun", name: "SHOTGUN", price: 100000,
+        id: "shotgun", name: "SHOTGUN", price: 50000,
         damage: 17, fireRate: 570, mag: 6, reserve: 54, speed: 13,
         pellets: 7, spread: .25, pierce: 0, reloadMs: 1500, recoil: 18, shake: 4, kb: 6
     },
     sniper: {
-        id: "sniper", name: "SNIPER", price: 250000,
+        id: "sniper", name: "SNIPER", price: 125000,
         damage: 95, fireRate: 950, mag: 5, reserve: 45, speed: 30,
         pellets: 1, spread: .004, pierce: 3, reloadMs: 1800, recoil: 22, shake: 3.5, kb: 9
     },
     lmg: {
-        id: "lmg", name: "LMG", price: 500000,
+        id: "lmg", name: "LMG", price: 250000,
         damage: 15, fireRate: 90, mag: 100, reserve: 400, speed: 17,
         pellets: 1, spread: .06, pierce: 0, reloadMs: 2600, recoil: 8, shake: 1.4, kb: 3
     }
@@ -102,25 +103,25 @@ WZ.WEAPON_ORDER = ["pistol", "rifle", "smg", "shotgun", "sniper", "lmg"];
 --------------------------------------------------------- */
 WZ.SKINS = {
     pistol_std:    { weapon: "pistol",  name: "STANDARD",       price: 0,     rarity: "common" },
-    pistol_galaxy: { weapon: "pistol",  name: "GALAXY",         price: 800,   rarity: "epic" },
-    pistol_steam:  { weapon: "pistol",  name: "STEAMPUNK",      price: 1500,  rarity: "legendary" },
+    pistol_galaxy: { weapon: "pistol",  name: "GALAXY",         price: 400,   rarity: "epic" },
+    pistol_steam:  { weapon: "pistol",  name: "STEAMPUNK",      price: 750,  rarity: "legendary" },
 
     rifle_std:     { weapon: "rifle",   name: "STANDARD",       price: 0,     rarity: "common" },
-    rifle_ember:   { weapon: "rifle",   name: "EMBER",          price: 1200,  rarity: "epic" },
-    rifle_marble:  { weapon: "rifle",   name: "GOLD MARBLE",    price: 2500,  rarity: "legendary" },
-    rifle_galaxy:  { weapon: "rifle",   name: "NEBULA",         price: 1800,  rarity: "epic" },
+    rifle_ember:   { weapon: "rifle",   name: "EMBER",          price: 600,  rarity: "epic" },
+    rifle_marble:  { weapon: "rifle",   name: "GOLD MARBLE",    price: 1250,  rarity: "legendary" },
+    rifle_galaxy:  { weapon: "rifle",   name: "NEBULA",         price: 900,  rarity: "epic" },
 
     smg_std:       { weapon: "smg",     name: "STANDARD",       price: 0,     rarity: "common" },
-    smg_viper:     { weapon: "smg",     name: "VIPER",          price: 1500,  rarity: "epic" },
-    smg_graffiti:  { weapon: "smg",     name: "GRAFFITI",       price: 2500,  rarity: "legendary" },
+    smg_viper:     { weapon: "smg",     name: "VIPER",          price: 750,  rarity: "epic" },
+    smg_graffiti:  { weapon: "smg",     name: "GRAFFITI",       price: 1250,  rarity: "legendary" },
 
     shotgun_std:   { weapon: "shotgun", name: "FACETED STEEL",  price: 0,     rarity: "common" },
 
     sniper_std:    { weapon: "sniper",  name: "STANDARD",       price: 0,     rarity: "common" },
-    sniper_azure:  { weapon: "sniper",  name: "AZURE",          price: 3000,  rarity: "legendary" },
+    sniper_azure:  { weapon: "sniper",  name: "AZURE",          price: 1500,  rarity: "legendary" },
 
     lmg_std:       { weapon: "lmg",     name: "STANDARD",       price: 0,     rarity: "common" },
-    lmg_phoenix:   { weapon: "lmg",     name: "PHOENIX",        price: 4000,  rarity: "legendary" }
+    lmg_phoenix:   { weapon: "lmg",     name: "PHOENIX",        price: 2000,  rarity: "legendary" }
 };
 WZ.defaultSkin = w => w + "_std";
 
@@ -169,28 +170,46 @@ WZ.MISSIONS = [
 --------------------------------------------------------- */
 WZ.MAPS = {
     city: {
-        id: "city", name: "CITY RUINS", price: 0, decor: "ruins",
+        id: "city", name: "CITY RUINS", price: 0, decor: "ruins", puzzles: ["simon", "cipher", "tap", "math", "mirror", "plates"],
         desc: "Broken streets and collapsed blocks. The starter arena.",
         preview: "linear-gradient(135deg,#1d3a46,#04090c)",
         bg: { c1: "#132630", c2: "#0b171e", c3: "#04090c", grid: "rgba(60,150,150,.07)", crack: "rgba(0,0,0,.35)", accent: "#1d3a46" }
     },
     desert: {
-        id: "desert", name: "SCORCHED DESERT", price: 400, decor: "dunes",
+        id: "desert", name: "SCORCHED DESERT", price: 400, decor: "dunes", puzzles: ["tap", "math", "cipher"],
         desc: "Sand dunes and dead highways. Less cover, more open lines of fire.",
         preview: "linear-gradient(135deg,#7a5530,#2a1d10)",
         bg: { c1: "#4a3520", c2: "#2a1d10", c3: "#0b0704", grid: "rgba(230,170,90,.08)", crack: "rgba(0,0,0,.4)", accent: "#5a4226" }
     },
     graveyard: {
-        id: "graveyard", name: "DEAD GRAVEYARD", price: 800, decor: "tombs",
+        id: "graveyard", name: "DEAD GRAVEYARD", price: 800, decor: "tombs", puzzles: ["simon", "mirror", "cipher"],
         desc: "Fog, tombstones and the dead rising from the soil.",
         preview: "linear-gradient(135deg,#2a4a38,#050806)",
         bg: { c1: "#1c2a22", c2: "#0e1712", c3: "#050806", grid: "rgba(120,220,160,.06)", crack: "rgba(0,0,0,.4)", accent: "#24362b" }
     },
     factory: {
-        id: "factory", name: "RUST FACTORY", price: 1200, decor: "pipes",
+        id: "factory", name: "RUST FACTORY", price: 1200, decor: "pipes", puzzles: ["mirror", "math", "simon", "plates"],
         desc: "Pipes, furnaces and tight corridors. Hardest arena.",
         preview: "linear-gradient(135deg,#5a3d2a,#080606)",
         bg: { c1: "#2a2226", c2: "#171214", c3: "#080606", grid: "rgba(255,140,60,.07)", crack: "rgba(0,0,0,.4)", accent: "#3d2b22" }
     }
 };
 WZ.MAP_ORDER = ["city", "desert", "graveyard", "factory"];
+
+/* ---------------------------------------------------------
+   TITLES. Earned automatically from progression. `need` is
+   checked against the player's saved stats (see WZ.checkTitles).
+--------------------------------------------------------- */
+WZ.TITLES = [
+    { id: "rookie",      name: "ROOKIE",          desc: "Reach wave 2",              test: u => u.wave >= 2 },
+    { id: "veteran",     name: "VETERAN",         desc: "Reach wave 10",             test: u => u.wave >= 10 },
+    { id: "warlord",     name: "WARLORD",         desc: "Reach wave 25",             test: u => u.wave >= 25 },
+    { id: "bane",        name: "ZOMBIE BANE",     desc: "Kill 500 zombies",          test: u => u.kills >= 500 },
+    { id: "exterminator",name: "EXTERMINATOR",    desc: "Kill 2000 zombies",         test: u => u.kills >= 2000 },
+    { id: "puzzler",     name: "PUZZLE SOLVER",   desc: "Solve 10 wave puzzles",     test: u => u.puzzlesSolved >= 10 },
+    { id: "codebreaker", name: "CODEBREAKER",     desc: "Solve 50 wave puzzles",     test: u => u.puzzlesSolved >= 50 },
+    { id: "explorer",    name: "EXPLORER",        desc: "Unlock 3 arenas",           test: u => u.unlockedMaps.length >= 3 },
+    { id: "arenamaster", name: "ARENA MASTER",    desc: "Unlock every arena",        test: u => u.unlockedMaps.length >= WZ.MAP_ORDER.length },
+    { id: "mission",     name: "MISSION MAN",     desc: "Complete 5 missions",       test: u => u.missionIndex >= 5 },
+    { id: "bossslayer",  name: "BOSS SLAYER",     desc: "Defeat a boss (every 5th wave)", test: u => u.bossKills >= 1 }
+];

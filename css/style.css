@@ -280,3 +280,19 @@ table.tbl td,table.tbl th{padding:6px 4px;border-bottom:1px solid #12272f;text-a
 .stockRow i{font-style:normal}
 .serumBtn{pointer-events:auto;position:absolute;right:calc(var(--sar) + 96px);bottom:calc(var(--sab) + 130px);width:62px;height:62px;padding:0;border-radius:50%;background:rgba(6,16,20,.75);font-size:24px;line-height:1}
 .serumBtn small{display:block;font-size:8px;letter-spacing:.5px}
+
+/* ---------- admin terminal ---------- */
+.termOut{height:170px;overflow:auto;background:#020608;border:1px solid var(--line);border-radius:8px;padding:8px;font-family:Consolas,"Courier New",monospace;font-size:12px;color:var(--green);white-space:pre-wrap;word-break:break-word;user-select:text;-webkit-user-select:text}
+.termIn{display:flex;gap:6px;align-items:center;margin-top:6px}
+.termIn span{font-family:Consolas,"Courier New",monospace;color:var(--green)}
+.termIn input{font-family:Consolas,"Courier New",monospace;font-size:13px;padding:8px 10px}
+
+/* dev terminal: /blur */
+html.fxBlur .screen{filter:blur(5px)}
+
+/* ---------- plate path puzzle ---------- */
+.plateGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:6px 0}
+.plate{aspect-ratio:1;width:100%;padding:0;border-radius:8px;background:#1a2a30;border:1px solid var(--line);min-height:0}
+.plate.safeHint{background:#2ee6a0;box-shadow:0 0 12px #2ee6a0}
+.plate.done{background:#2a7d5e}
+.plate.trap{background:#8a2020}

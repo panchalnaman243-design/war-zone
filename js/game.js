@@ -267,6 +267,7 @@ function exitToMenu(){
 
 function saveProgress(dead){
     const u = G.user;
+    announceTitles(WZ.checkTitles(u));
     u.score = G.score;
     u.bestScore = Math.max(u.bestScore, G.score);
     u.wave = Math.max(u.wave, G.wave);
@@ -290,6 +291,10 @@ function gameOver(){
     const t0 = performance.now();
     const tail = () => { if(performance.now() - t0 < 900){ render(); requestAnimationFrame(tail); } };
     tail();
+}
+
+function announceTitles(list){
+    for(const t of list) WZ.toast(`🏅 TITLE UNLOCKED: ${t.name}`, "good");
 }
 
 /* ---------------------------------------------------------
@@ -408,7 +413,7 @@ function poisonSplash(z){
    Solve it = POWER SERUM for the next wave. Fail = no serum.
    Difficulty ramps with the wave number.
 --------------------------------------------------------- */
-const PUZZLE_TYPES = ["simon", "cipher", "tap", "math", "mirror"];
+const PUZZLE_TYPES = ["simon", "cipher", "tap", "math", "mirror", "plates"];
 let pzTimers = [];
 
 // time multiplier: tighter every wave, never below 55% of base time
@@ -426,8 +431,9 @@ function showPuzzle(){
     for(const k in keys) keys[k] = false;
     mouse.down = false; stick.move.id = stick.aim.id = null; stick.aim.active = false;
     hideStick("stickL"); hideStick("stickR");
-    const type = PUZZLE_TYPES[WZ.randInt(0, PUZZLE_TYPES.length - 1)];
-    const fns = { simon: puzzleSimon, cipher: puzzleCipher, tap: puzzleTap, math: puzzleMath, mirror: puzzleMirror };
+    const pool = (G.map && G.map.puzzles) || PUZZLE_TYPES;   // each arena has its own puzzle set
+    const type = pool[WZ.randInt(0, pool.length - 1)];
+    const fns = { simon: puzzleSimon, cipher: puzzleCipher, tap: puzzleTap, math: puzzleMath, mirror: puzzleMirror, plates: puzzlePlates };
     fns[type](overlay, onPuzzleWin, onPuzzleFail);
 }
 
@@ -441,6 +447,8 @@ function onPuzzleWin(){
     if(!G || !G.puzzlePending) return;   // guards against double calls
     closePuzzle();
     G.puzzlePending = false; G.puzzleDone = true;
+    G.user.puzzlesSolved = (G.user.puzzlesSolved || 0) + 1;
+    announceTitles(WZ.checkTitles(G.user));
     addPower(POWER_WIN);
 }
 
@@ -632,6 +640,61 @@ function puzzleMath(overlay, win, fail){
     showQ();
 }
 
+/* PUZZLE 6: PLATE PATH (a safe path flashes one plate at a time; step the same path, avoid the traps) */
+function puzzlePlates(overlay, win, fail){
+    const N = 4;
+    const len = Math.min(9, 4 + Math.floor(G.wave / 3));
+    const path = [], safe = new Set();
+    while(path.length < len){ const c = WZ.randInt(0, N * N - 1); if(!safe.has(c)){ safe.add(c); path.push(c); } }
+    let step = 0, live = false;
+
+    const body = document.createElement("div");
+    body.innerHTML = `<div class="plateGrid" id="plateGrid"></div>
+        <p style="${pzNote}" id="plateProg">Watch the safe path...</p>`;
+    makePzCard(overlay, `Remember the <b>${len} safe plates</b> and step on them in the same order. Any other plate is a trap.`, "PLATE PATH", body);
+
+    const grid = body.querySelector("#plateGrid");
+    for(let i = 0; i < N * N; i++){
+        const d = document.createElement("button");
+        d.className = "plate"; d.dataset.i = i; d.disabled = true; grid.appendChild(d);
+    }
+    const plates = [...grid.children];
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+
+    (async () => {
+        await wait(500);
+        const flash = Math.max(380, 720 - G.wave * 15);
+        for(let i = 0; i < path.length; i++){
+            if(!body.isConnected) return;
+            plates[path[i]].classList.add("safeHint");
+            await wait(flash);
+            plates[path[i]].classList.remove("safeHint");
+            await wait(160);
+        }
+        if(!body.isConnected) return;
+        live = true;
+        plates.forEach(d => d.disabled = false);
+        body.querySelector("#plateProg").textContent = `Your turn: 0 / ${len}`;
+        startCountdown(scaled(12000), () => { plates.forEach(d => d.disabled = true); setTimeout(fail, 400); });
+    })();
+
+    grid.addEventListener("click", e => {
+        const d = e.target.closest(".plate");
+        if(!live || !d || d.disabled) return;
+        const i = +d.dataset.i;
+        if(i !== path[step]){
+            live = false; stopAllTimers();
+            d.classList.add("trap"); plates.forEach(x => x.disabled = true);
+            body.querySelector("#plateProg").textContent = "✗ TRAP!";
+            setTimeout(fail, 500); return;
+        }
+        step++;
+        d.classList.add("done"); d.disabled = true;
+        body.querySelector("#plateProg").textContent = `✓ ${step} / ${len}`;
+        if(step === len){ live = false; stopAllTimers(); setTimeout(win, 300); }
+    });
+}
+
 /* PUZZLE 5: PATTERN MIRROR (6x6, right half must mirror the visible left half) */
 function puzzleMirror(overlay, win, fail){
     const COLS = 6, ROWS = 6, HALF = 3, TOTAL = COLS * ROWS;
@@ -790,6 +853,7 @@ function update(dt, f){
     /* wave progress (offline only) */
     if(!G.online && G.killsWave >= G.need && G.zombies.every(z => z.dying)){
         // EVERY wave ends with a hard puzzle. Solve it = POWER SERUM for the next wave.
+        if(CFG.FEATURES.puzzles === false) G.puzzleDone = true;
         if(!G.puzzleDone){
             if(!G.puzzlePending){ G.puzzlePending = true; showPuzzle(); }
             hud(); return;
@@ -916,13 +980,27 @@ function killZombie(z, ang){
     if(z.poison > 0) poisonSplash(z);
     G.killsWave++; G.kills++;
     const base = { normal: 10, runner: 15, toxic: 20, brute: 30, boss: 200 }[z.type] || 10;
+    if(z.type === "boss") WZ.toast("BOSS DOWN! +50 coins", "good");
     G.score += base + G.scoreBonus;
     const u = G.user;
     u.kills = (u.kills || 0) + 1;
     u.xp += CFG.ECONOMY.xpPerKill;
     const m = WZ.MISSIONS[u.missionIndex % WZ.MISSIONS.length];
     if(m.type === "kills") u.missionProgress++;
-    if(CFG.ECONOMY.coinPerKill){ u.coins += CFG.ECONOMY.coinPerKill; G.coinsEarned += CFG.ECONOMY.coinPerKill; }
+    if(CFG.ECONOMY.coinPerKill){
+        G.coinFrac = (G.coinFrac || 0) + CFG.ECONOMY.coinPerKill;
+        const whole = Math.floor(G.coinFrac);
+        if(whole){ u.coins += whole; G.coinsEarned += whole; G.coinFrac -= whole; }
+    }
+    if(z.type === "boss"){ u.bossKills = (u.bossKills || 0) + 1; u.coins += 50; G.coinsEarned += 50; }
+    // wave 100 boss: 20% chance to drop a random serum into stock (if there is room)
+    if(z.type === "boss" && G.wave === 100 && Math.random() < 0.2){
+        if(G.stock.length < SERUM_STOCK_MAX){
+            const id = ELEM_ORDER[WZ.randInt(0, ELEM_ORDER.length - 1)];
+            G.stock.push(id);
+            WZ.toast(`SERUM DROP: ${ELEMENTS[id].name || id.toUpperCase()}`, "good");
+        }else WZ.toast("Serum dropped, but your stock is full", "bad");
+    }
     WZ.fx.blood(z.x, z.y, z.h * .55, ang, 40, true);
     WZ.sfx.kill(); WZ.haptic(z.type === "boss" ? 50 : 14);
     if(WZ.settings.screenShake) G.shake = Math.max(G.shake, z.type === "boss" ? 9 : 3);
@@ -1025,7 +1103,7 @@ function updateZombies(dt, f){
 }
 
 function hurtPlayer(dmg){
-    if(ended) return;
+    if(ended || WZ.cheats.god) return;
     G.hp -= dmg * G.armor; G.hurtT = 260;
     if(WZ.settings.screenShake) G.shake = Math.max(G.shake, 6);
     WZ.sfx.hurt(); WZ.haptic(35);
@@ -1220,8 +1298,9 @@ function sendMove(){
 }
 
 function newNetZombie(z){
-    const shirts = WZ.ZOMBIE_TYPES.normal.shirts.length;
-    return { id: z.id, type: "normal", variant: z.id % shirts, bulk: 1, h: charH * ZSTAT.normal.size,
+    const type = z.type === "boss" ? "boss" : "normal";
+    const shirts = WZ.ZOMBIE_TYPES[type].shirts.length;
+    return { id: z.id, type, variant: z.id % shirts, bulk: ZSTAT[type].bulk, h: charH * ZSTAT[type].size,
              x: 0, y: 0, hp: z.hp, maxhp: z.maxhp, dmg: 7, speed: 1, anim: Math.random() * 8,
              hit: 0, stagger: 0, kx: 0, atk: 0, atkCd: 0, face: 1, dying: false, dt: 0, wob: 0 };
 }
