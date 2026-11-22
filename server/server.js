@@ -11,6 +11,12 @@ const { Pool } = require("pg");
 const PORT = Number(process.env.PORT || 3000);
 const WORLD_W = 1000, WORLD_H = 600, MAX_PLAYERS = 8;
 const accounts = new Map();
+const ADMIN_ACCOUNT_IDS = new Set(["NITIN", "NAMAN", "LOVEKESH"]);
+function validAdminLogin(id, password) {
+  if (!ADMIN_ACCOUNT_IDS.has(id)) return true;
+  const required = process.env["ADMIN_" + id + "_PASSWORD"];
+  return !!required && password === required;
+}
 // Persistent global leaderboard. Set DATABASE_URL in the Render service environment.
 const pool = process.env.DATABASE_URL ? new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -126,7 +132,7 @@ function leave(ws) {
 function createRoom(ws, msg) {
   const info = sockets.get(ws);
   if (!info) return fail(ws, "Log in first.");
-  if (info.room) return fail(ws, "Leave your current room first.");
+  if (info.room || info.duel || info.duelQueue) return fail(ws, "Leave your current match first.");
   const code = makeCode();
   const room = { code, host: info.account, players: new Map(), started: false, wave: 1, need: 6, killsWave: 0, zombies: [], bullets: [], spawnLeft: 6, spawnAt: 0, timer: null };
   rooms.set(code, room);
@@ -135,7 +141,7 @@ function createRoom(ws, msg) {
 function joinRoom(ws, msg) {
   const info = sockets.get(ws);
   if (!info) return fail(ws, "Log in first.");
-  if (info.room) return fail(ws, "Leave your current room first.");
+  if (info.room || info.duel || info.duelQueue) return fail(ws, "Leave your current match first.");
   const room = rooms.get(String(msg.code || "").toUpperCase());
   if (!room) return fail(ws, "Room not found. Check the code.");
   if (room.started) return fail(ws, "That match has already started.");
@@ -455,6 +461,7 @@ async function onMessage(ws, raw) {
     if (sockets.has(ws)) return fail(ws, "You are already logged in.");
     const id = cleanId(msg.id), pw = String(msg.pw || "");
     if (id.length < 3 || pw.length < 4 || pw.length > 64) return fail(ws, "Use an ID of 3-16 letters/numbers and a password of 4-64 characters.");
+    if (!validAdminLogin(id, pw)) return fail(ws, "This admin ID is reserved. The owner must configure its private password in Render.");
     if (msg.type === "REGISTER") {
       if (accounts.has(id)) return fail(ws, "That online ID is already taken.");
       const record = passwordRecord(pw);
