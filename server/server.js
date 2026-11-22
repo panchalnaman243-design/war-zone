@@ -73,9 +73,17 @@ function safeSkin(v) {
 function leave(ws) {
   const info = sockets.get(ws);
   if (!info) return;
-  const { room } = info;
+
+  // Remove the socket mapping first so close/error events cannot process it twice.
+  sockets.delete(ws);
+  const room = info.room;
+
+  // A logged-in player may disconnect before joining a room.
+  if (!room || !room.players) return;
+
   const player = room.players.get(ws);
-  room.players.delete(ws); sockets.delete(ws);
+  room.players.delete(ws);
+
   if (!room.players.size) {
     clearInterval(room.timer);
     rooms.delete(room.code);
