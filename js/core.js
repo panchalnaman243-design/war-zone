@@ -209,7 +209,7 @@ document.addEventListener("click", e => { if(e.target.closest && e.target.closes
 WZ.checkTitles = function(u){
     const earned = [];
     for(const t of WZ.TITLES){
-        if(!u.titles.includes(t.id) && t.test(u)){ u.titles.push(t.id); earned.push(t); }
+        if(!t.special && !u.titles.includes(t.id) && t.test(u)){ u.titles.push(t.id); earned.push(t); }
     }
     if(!u.title && u.titles.length) u.title = u.titles[u.titles.length - 1];
     return earned;
