@@ -21,6 +21,8 @@ let adminUnlocked = false;   // resets on every reload - never persisted, never 
 ui.saveUser = function(u){
     user = u || user;
     const users = WZ.store.getUsers(); users[user.id] = user; WZ.store.saveUsers(users);
+    // Sync this main-game account and its best score to the cross-device leaderboard.
+    if(WZ.online && user.pw) WZ.online.syncGlobalUser(user);
 };
 ui.levelCheck = function(u){
     u = u || user;
@@ -102,7 +104,13 @@ function updateHome(){
     $("missionMini").innerHTML = `<b>${esc(m.name)}</b>${esc(m.desc)}<div class="progress"><i style="width:${Math.min(100, prog / m.goal * 100)}%"></i></div>${prog}/${m.goal}`;
 
     const users = Object.values(WZ.store.getUsers()).sort((a, b) => WZ.safeInt(b.bestScore) - WZ.safeInt(a.bestScore)).slice(0, 6);
-    $("boardList").innerHTML = users.map((p, i) =>
+    ui.renderLeaderboard(users.map(p => ({ id: p.id, bestScore: WZ.safeInt(p.bestScore) })));
+    if(WZ.online) WZ.online.refreshLeaderboard();
+}
+
+ui.renderLeaderboard = function(players){
+    const rows = (Array.isArray(players) ? players : []).slice(0, 6);
+    $("boardList").innerHTML = rows.map((p, i) =>
         `<div class="board"><i>${i + 1}</i><span>${esc(p.id)}</span><b>${fmt(WZ.safeInt(p.bestScore))}</b></div>`).join("") || `<div class="muted tiny">No scores yet.</div>`;
 }
 
