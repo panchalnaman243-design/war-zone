@@ -259,9 +259,9 @@ function resume(){
     WZ.ui && WZ.ui.closeModal && WZ.ui.closeModal();
     lastT = performance.now(); raf = requestAnimationFrame(loop);
 }
-function quit(){ saveProgress(false); exitToMenu(); }
+function quit(){ if(G && G.duel){ WZ.online.send({ type:"DUEL_FORFEIT" }); exitToMenu(); return; } saveProgress(false); exitToMenu(); }
 function exitToMenu(){
-    if(G && G.online){ if(!G.duel) WZ.online.send({ type: "LEAVE" }); G.online = null; }
+    if(G && G.online){ if(!G.duel) WZ.online.send({ type: "LEAVE" }); G.online = null; G.duel = false; }
     running = false; paused = false; cancelAnimationFrame(raf);
     ["pauseOverlay", "overOverlay"].forEach(i => $(i).classList.add("hidden"));
     WZ.ui.showHome();
@@ -1121,7 +1121,8 @@ function hurtPlayer(dmg){
 function hud(force){
     const h = G.hud, set = (k, v, fn) => { if(force || h[k] !== v){ h[k] = v; fn(v); } };
     set("score", G.score, v => $("hudScore").textContent = WZ.fmt(v));
-    set("wave", G.wave, v => $("hudWave").textContent = v);
+    const waveLabel = G.duel ? `R${G.wave} · ${(G.duelWins.find(p=>p.id===G.online.playerId)||{}).wins||0}-${(G.duelWins.find(p=>p.id!==G.online.playerId)||{}).wins||0}` : G.wave;
+    set("wave", waveLabel, v => $("hudWave").textContent = v);
     const hp = Math.max(0, Math.ceil(G.hp));
     set("hp", hp, v => {
         const p = Math.round(v / G.maxHp * 100);
