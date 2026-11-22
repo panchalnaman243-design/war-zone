@@ -344,6 +344,7 @@ function finishDuel(duel, winner, reason="complete") {
       youWon: !!winner && p === winner,
       draw: !winner,
       reason,
+      roundsPlayed: duel.round,
       wins: players.map(x=>({id:x.id,name:x.account,wins:x.wins})),
       wallet: account ? account.coins : 0,
       bonus: winner && p === winner ? 50 : 0,
