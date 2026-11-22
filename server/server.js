@@ -247,6 +247,7 @@ function sendDuelState(duel) {
 }
 function startDuelRound(duel) {
   duel.bullets = [];
+  duel.roundEnded = false;
   duel.roundStarted = Date.now();
   duel.round++;
   const players = [...duel.players.values()];
@@ -294,7 +295,7 @@ function cancelDuelQueue(ws) {
 }
 function duelMove(ws, msg) {
   const info = sockets.get(ws), duel = info && info.duel;
-  if (!duel || !duel.roundStarted) return;
+  if (!duel || !duel.roundStarted || duel.roundEnded) return;
   const p = duel.players.get(ws);
   const x = Number(msg.x), y = Number(msg.y);
   if (!p || !Number.isFinite(x) || !Number.isFinite(y)) return;
@@ -308,7 +309,7 @@ function duelFire(ws, msg) {
   const info = sockets.get(ws), duel = info && info.duel;
   const p = duel && duel.players.get(ws), angle = Number(msg.angle);
   const now = Date.now();
-  if (!p || !p.alive || p.ammo <= 0 || !Number.isFinite(angle) || now-p.lastFire < 180) return;
+  if (!duel || duel.roundEnded || !p || !p.alive || p.ammo <= 0 || !Number.isFinite(angle) || now-p.lastFire < 180) return;
   p.lastFire = now; p.ammo--;
   if (p.ammo === 0) p.reloadAt = now + 1700;
   duel.bullets.push({ owner:p.id, x:p.x, y:p.y-35, vx:Math.cos(angle)*17, vy:Math.sin(angle)*17, life:70 });
@@ -357,7 +358,8 @@ function finishDuel(duel, winner, reason="complete") {
   stopDuel(duel);
 }
 function endDuelRound(duel, winner) {
-  if (!duel || duel.finished) return;
+  if (!duel || duel.finished || duel.roundEnded) return;
+  duel.roundEnded = true;
   const players = [...duel.players.values()];
   for (const p of players) {
     const account = accounts.get(p.account);
@@ -379,7 +381,7 @@ function endDuelRound(duel, winner) {
   setTimeout(() => { if (!duel.finished) startDuelRound(duel); }, 1800);
 }
 function tickDuel(duel) {
-  if (!duel || duel.finished) return;
+  if (!duel || duel.finished || duel.roundEnded) return;
   const players = [...duel.players.values()];
   for (const p of players) {
     if (p.alive && p.ammo===0 && p.reloadAt && Date.now()>=p.reloadAt) { p.ammo=30; p.reloadAt=0; }
