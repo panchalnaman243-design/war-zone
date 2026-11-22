@@ -261,7 +261,7 @@ function resume(){
 }
 function quit(){ saveProgress(false); exitToMenu(); }
 function exitToMenu(){
-    if(G && G.online){ WZ.online.send({ type: "LEAVE" }); G.online = null; }
+    if(G && G.online){ if(!G.duel) WZ.online.send({ type: "LEAVE" }); G.online = null; }
     running = false; paused = false; cancelAnimationFrame(raf);
     ["pauseOverlay", "overOverlay"].forEach(i => $(i).classList.add("hidden"));
     WZ.ui.showHome();
