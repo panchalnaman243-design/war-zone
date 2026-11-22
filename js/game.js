@@ -199,7 +199,7 @@ function start(user, online){
         puzzlePending: false, puzzleDone: false
     };
     G.map = WZ.MAPS[user.currentMap] || WZ.MAPS.city;
-    G.online = online ? { code: online.code, playerId: online.playerId, lastMove: 0, hp: undefined, hasState:false } : null;
+    G.online = online ? { code: online.code, playerId: online.playerId, account:online.account, lastMove: 0, hp: undefined, hasState:false } : null;
     G.duel = !!(online && online.duel); G.onlineWallet = online && Number(online.wallet) || 0; G.duelWins = [];
     G.remote = [];
     G.maxHp = G.online ? 100 : ch.health + upg("iron_heart") * 10;   // online: server uses 100 hp
