@@ -10,6 +10,9 @@ const { WebSocketServer, WebSocket } = require("ws");
 const PORT = Number(process.env.PORT || 3000);
 const WORLD_W = 1000, WORLD_H = 600, MAX_PLAYERS = 8;
 const accounts = new Map();
+// Main-game accounts synced from every device for the public global leaderboard.
+// This starter implementation is in-memory, like the existing online accounts.
+const globalPlayers = new Map();
 const rooms = new Map();
 const sockets = new Map();
 let nextPlayerId = 1, nextZombieId = 1;
@@ -201,6 +204,34 @@ function onMessage(ws, raw) {
   let msg;
   try { msg = JSON.parse(raw.toString()); } catch { return fail(ws, "Invalid message."); }
   if (!msg || typeof msg.type !== "string") return fail(ws, "Invalid message.");
+  // Public global leaderboard: IDs and best scores synced by the main game.
+  if (msg.type === "GLOBAL_LEADERBOARD") {
+    const players = [...globalPlayers.entries()]
+      .map(([id, p]) => ({ id, bestScore: p.bestScore, level: p.level, kills: p.kills, wave: p.wave }))
+      .sort((a, b) => b.bestScore - a.bestScore || a.id.localeCompare(b.id))
+      .slice(0, 50);
+    return send(ws, "GLOBAL_LEADERBOARD", { players });
+  }
+  if (msg.type === "GLOBAL_SYNC") {
+    const id = cleanId(msg.id);
+    const credential = String(msg.credential || "");
+    if (id.length < 3 || !/^[a-f0-9]{8,128}$/i.test(credential)) {
+      return send(ws, "GLOBAL_SYNC_ERROR", { message: "Could not sync this player ID. Please log in again." });
+    }
+    let player = globalPlayers.get(id);
+    if (!player) {
+      player = { ...passwordRecord(credential), bestScore: 0, level: 1, kills: 0, wave: 1 };
+      globalPlayers.set(id, player);
+    } else if (!passwordMatches(credential, player)) {
+      return send(ws, "GLOBAL_SYNC_ERROR", { message: "This player ID is already registered with a different password on another device." });
+    }
+    player.bestScore = Math.max(player.bestScore, Math.max(0, Math.min(1000000000, Number(msg.bestScore) || 0)));
+    player.level = Math.max(player.level, Math.max(1, Math.min(100000, Number(msg.level) || 1)));
+    player.kills = Math.max(player.kills, Math.max(0, Math.min(1000000000, Number(msg.kills) || 0)));
+    player.wave = Math.max(player.wave, Math.max(1, Math.min(100000, Number(msg.wave) || 1)));
+    send(ws, "GLOBAL_SYNCED", { id, bestScore: player.bestScore });
+    return;
+  }
   if (msg.type === "REGISTER" || msg.type === "LOGIN") {
     if (sockets.has(ws)) return fail(ws, "You are already logged in.");
     const id = cleanId(msg.id), pw = String(msg.pw || "");
