@@ -482,6 +482,7 @@ async function onMessage(ws, raw) {
   }
   if (msg.type === "DUEL_QUEUE") return queueDuel(ws, msg);
   if (msg.type === "DUEL_CANCEL") return cancelDuelQueue(ws);
+  if (msg.type === "DUEL_FORFEIT") { const d=sockets.get(ws)?.duel; if(d){ const winner=[...d.players.values()].find(p=>p.ws!==ws); finishDuel(d,winner,"forfeit"); } return; }
   if (msg.type === "CREATE_ROOM") return createRoom(ws, msg);
   if (msg.type === "JOIN_ROOM") return joinRoom(ws, msg);
   const info = sockets.get(ws), room = info && info.room;
