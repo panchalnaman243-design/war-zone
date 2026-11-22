@@ -1,7 +1,4 @@
-/* WAR ZONE Online Co-op server.
- * WebSocket protocol for up to 8 players per room.
- * Accounts and wallets are in memory in this starter version.
- */
+/* WAR ZONE Online server: co-op rooms, cross-device 1v1 duels and online accounts. */
 "use strict";
 const http = require("http");
 const crypto = require("crypto");
