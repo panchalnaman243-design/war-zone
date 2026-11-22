@@ -211,5 +211,8 @@ WZ.TITLES = [
     { id: "explorer",    name: "EXPLORER",        desc: "Unlock 3 arenas",           test: u => u.unlockedMaps.length >= 3 },
     { id: "arenamaster", name: "ARENA MASTER",    desc: "Unlock every arena",        test: u => u.unlockedMaps.length >= WZ.MAP_ORDER.length },
     { id: "mission",     name: "MISSION MAN",     desc: "Complete 5 missions",       test: u => u.missionIndex >= 5 },
-    { id: "bossslayer",  name: "BOSS SLAYER",     desc: "Defeat a boss (every 5th wave)", test: u => u.bossKills >= 1 }
+    { id: "bossslayer",  name: "BOSS SLAYER",     desc: "Defeat a boss (every 5th wave)", test: u => u.bossKills >= 1 },
+    { id: "god", name: "GOD", desc: "Defeat admin NITIN in online 1v1", special: true, test: () => false },
+    { id: "strongestcreature", name: "THE STRONGEST CREATURE", desc: "Defeat admin NAMAN in online 1v1", special: true, test: () => false },
+    { id: "hacker", name: "HACKER", desc: "Defeat admin LOVEKESH in online 1v1", special: true, test: () => false }
 ];
