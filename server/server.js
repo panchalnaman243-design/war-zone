@@ -18,7 +18,9 @@ const pool = process.env.DATABASE_URL ? new Pool({
 }) : null;
 const rooms = new Map();
 const sockets = new Map();
-let nextPlayerId = 1, nextZombieId = 1;
+const duelQueue = [];
+const duels = new Map();
+let nextPlayerId = 1, nextZombieId = 1, nextDuelId = 1;
 
 const server = http.createServer((req, res) => {
   if (req.url === "/health" || req.url === "/") {
@@ -79,6 +81,19 @@ function safeSkin(v) {
 function leave(ws) {
   const info = sockets.get(ws);
   if (!info) return;
+  if (info.duelQueue) {
+    const qi = duelQueue.findIndex(p => p.ws === ws);
+    if (qi >= 0) duelQueue.splice(qi, 1);
+    info.duelQueue = false;
+  }
+  if (info.duel) {
+    const duel = info.duel;
+    const other = [...duel.players.values()].find(p => p.ws !== ws);
+    sockets.delete(ws);
+    if (other) finishDuel(duel, other, "opponent_left");
+    else stopDuel(duel);
+    return;
+  }
 
   // Remove the socket mapping first so close/error events cannot process it twice.
   sockets.delete(ws);
@@ -203,6 +218,175 @@ function checkMatchOver(room) {
   room.players.clear();
   rooms.delete(room.code);
 }
+
+function duelState(duel) {
+  return {
+    duel: true, round: duel.round, maxRounds: 4,
+    wins: [...duel.players.values()].map(p => ({ id:p.id, name:p.account, wins:p.wins })),
+    players: [...duel.players.values()].map(p => ({
+      id:p.id, name:p.account, character:p.character, skin:p.skin,
+      x:p.x, y:p.y, facing:p.facing, hp:p.hp, ammo:p.ammo, alive:p.alive
+    })),
+    zombies: [],
+    bullets: duel.bullets.map(b => ({ x:b.x, y:b.y, a:Math.atan2(b.vy,b.vx) }))
+  };
+}
+function broadcastDuel(duel, type, data={}) {
+  for (const p of duel.players.values()) send(p.ws, type, data);
+}
+function sendDuelState(duel) {
+  broadcastDuel(duel, "DUEL_STATE", { s: duelState(duel) });
+}
+function startDuelRound(duel) {
+  duel.bullets = [];
+  duel.roundStarted = Date.now();
+  duel.round++;
+  const players = [...duel.players.values()];
+  players.forEach((p,i) => {
+    p.x = i === 0 ? 170 : WORLD_W - 170;
+    p.y = 390 + (i ? -35 : 35);
+    p.facing = i === 0 ? 1 : -1;
+    p.hp = 100; p.ammo = 30; p.alive = true;
+    p.lastFire = 0; p.reloadAt = 0;
+  });
+  sendDuelState(duel);
+}
+function queueDuel(ws, msg) {
+  const info = sockets.get(ws);
+  if (!info) return fail(ws, "Log in to your online account first.");
+  if (info.room || info.duel || info.duelQueue) return fail(ws, "Leave your current match first.");
+  const me = { ws, account: info.account, character:safeCharacter(msg.character), skin:safeSkin(msg.skin), id:nextPlayerId++, wins:0, hp:100, ammo:30, alive:true, x:170, y:390, facing:1, lastFire:0, reloadAt:0 };
+  const index = duelQueue.findIndex(p => p.account !== me.account && p.ws.readyState === WebSocket.OPEN);
+  if (index < 0) {
+    duelQueue.push(me); info.duelQueue = true;
+    send(ws, "DUEL_QUEUED", { message:"Searching for an opponent..." });
+    return;
+  }
+  const opponent = duelQueue.splice(index,1)[0];
+  const otherInfo = sockets.get(opponent.ws);
+  if (!otherInfo) return queueDuel(ws, msg);
+  otherInfo.duelQueue = false;
+  const duel = { id:nextDuelId++, players:new Map(), round:0, bullets:[], timer:null, finished:false };
+  duel.players.set(opponent.ws, opponent);
+  duel.players.set(ws, me);
+  info.duel = duel; otherInfo.duel = duel;
+  duels.set(duel.id, duel);
+  send(opponent.ws, "DUEL_FOUND", { playerId:opponent.id, opponent:me.account, duelId:duel.id });
+  send(ws, "DUEL_FOUND", { playerId:me.id, opponent:opponent.account, duelId:duel.id });
+  startDuelRound(duel);
+  duel.timer = setInterval(() => tickDuel(duel), 50);
+}
+function cancelDuelQueue(ws) {
+  const info = sockets.get(ws);
+  if (!info || !info.duelQueue) return;
+  const i = duelQueue.findIndex(p => p.ws === ws);
+  if (i >= 0) duelQueue.splice(i,1);
+  info.duelQueue = false;
+  send(ws, "DUEL_CANCELLED");
+}
+function duelMove(ws, msg) {
+  const info = sockets.get(ws), duel = info && info.duel;
+  if (!duel || !duel.roundStarted) return;
+  const p = duel.players.get(ws);
+  const x = Number(msg.x), y = Number(msg.y);
+  if (!p || !Number.isFinite(x) || !Number.isFinite(y)) return;
+  const dx = Math.max(-20, Math.min(20, x-p.x));
+  const dy = Math.max(-20, Math.min(20, y-p.y));
+  p.x = Math.max(35, Math.min(WORLD_W-35,p.x+dx));
+  p.y = Math.max(190, Math.min(WORLD_H-10,p.y+dy));
+  if (dx) p.facing = dx > 0 ? 1 : -1;
+}
+function duelFire(ws, msg) {
+  const info = sockets.get(ws), duel = info && info.duel;
+  const p = duel && duel.players.get(ws), angle = Number(msg.angle);
+  const now = Date.now();
+  if (!p || !p.alive || p.ammo <= 0 || !Number.isFinite(angle) || now-p.lastFire < 180) return;
+  p.lastFire = now; p.ammo--;
+  if (p.ammo === 0) p.reloadAt = now + 1700;
+  duel.bullets.push({ owner:p.id, x:p.x, y:p.y-35, vx:Math.cos(angle)*17, vy:Math.sin(angle)*17, life:70 });
+}
+function stopDuel(duel) {
+  if (!duel || duel.finished) return;
+  duel.finished = true;
+  clearInterval(duel.timer);
+  duels.delete(duel.id);
+  for (const p of duel.players.values()) {
+    const info = sockets.get(p.ws);
+    if (info) { info.duel = null; info.duelQueue = false; }
+  }
+}
+function finishDuel(duel, winner, reason="complete") {
+  if (!duel || duel.finished) return;
+  const players = [...duel.players.values()];
+  const loser = winner ? players.find(p => p !== winner) : null;
+  if (winner) winner.wins = Math.max(winner.wins, 3);
+  const titleMap = { NITIN:["god","GOD"], NAMAN:["strongestcreature","THE STRONGEST CREATURE"], LOVEKESH:["hacker","HACKER"] };
+  const special = winner && loser && titleMap[loser.account.toUpperCase()];
+  if (winner) {
+    const account = accounts.get(winner.account);
+    if (account) account.coins += 50;
+  }
+  for (const p of players) {
+    const account = accounts.get(p.account);
+    send(p.ws, "DUEL_OVER", {
+      winner: winner ? winner.account : null,
+      youWon: !!winner && p === winner,
+      draw: !winner,
+      reason,
+      wins: players.map(x=>({id:x.id,name:x.account,wins:x.wins})),
+      wallet: account ? account.coins : 0,
+      bonus: winner && p === winner ? 50 : 0,
+      titleId: winner && p === winner && special ? special[0] : null,
+      titleName: winner && p === winner && special ? special[1] : null
+    });
+  }
+  stopDuel(duel);
+}
+function endDuelRound(duel, winner) {
+  if (!duel || duel.finished) return;
+  const players = [...duel.players.values()];
+  for (const p of players) {
+    const account = accounts.get(p.account);
+    if (account) account.coins += winner ? (p === winner ? 10 : 5) : 5;
+  }
+  if (winner) winner.wins++;
+  const leader = players.find(p=>p.wins>=3);
+  broadcastDuel(duel, "DUEL_ROUND_OVER", {
+    round:duel.round, winner:winner ? winner.account : null,
+    wins:players.map(p=>({id:p.id,name:p.account,wins:p.wins})),
+    wallets:players.map(p=>({id:p.id,coins:accounts.get(p.account)?.coins||0}))
+  });
+  if (leader) return finishDuel(duel, leader);
+  if (duel.round >= 4) {
+    const a=players[0], b=players[1];
+    return finishDuel(duel, a.wins===b.wins ? null : (a.wins>b.wins ? a : b));
+  }
+  setTimeout(() => { if (!duel.finished) startDuelRound(duel); }, 1800);
+}
+function tickDuel(duel) {
+  if (!duel || duel.finished) return;
+  const players = [...duel.players.values()];
+  for (const p of players) {
+    if (p.alive && p.ammo===0 && p.reloadAt && Date.now()>=p.reloadAt) { p.ammo=30; p.reloadAt=0; }
+  }
+  for (const b of duel.bullets) {
+    b.x += b.vx; b.y += b.vy; b.life--;
+    const target = players.find(p=>p.id!==b.owner && p.alive);
+    if (target && Math.hypot(target.x-b.x,(target.y-35)-b.y)<30) {
+      target.hp = Math.max(0,target.hp-25); b.life=0;
+      if (target.hp<=0) target.alive=false;
+    }
+  }
+  duel.bullets = duel.bullets.filter(b=>b.life>0 && b.x>-50 && b.x<WORLD_W+50 && b.y>130 && b.y<WORLD_H+50);
+  const dead = players.find(p=>!p.alive);
+  if (dead) return endDuelRound(duel, players.find(p=>p!==dead));
+  if (Date.now()-duel.roundStarted > 90000) {
+    const [a,b]=players;
+    return endDuelRound(duel, a.hp===b.hp ? null : (a.hp>b.hp ? a : b));
+  }
+  sendDuelState(duel);
+}
+
 async function onMessage(ws, raw) {
   let msg;
   try { msg = JSON.parse(raw.toString()); } catch { return fail(ws, "Invalid message."); }
@@ -265,9 +449,13 @@ async function onMessage(ws, raw) {
     sockets.set(ws, { account: id, room: null });
     return;
   }
+  if (msg.type === "DUEL_QUEUE") return queueDuel(ws, msg);
+  if (msg.type === "DUEL_CANCEL") return cancelDuelQueue(ws);
   if (msg.type === "CREATE_ROOM") return createRoom(ws, msg);
   if (msg.type === "JOIN_ROOM") return joinRoom(ws, msg);
   const info = sockets.get(ws), room = info && info.room;
+  if (info && info.duel && msg.type === "MOVE") return duelMove(ws, msg);
+  if (info && info.duel && msg.type === "FIRE") return duelFire(ws, msg);
   if (msg.type === "START") return startMatch(ws);
   if (msg.type === "LEAVE") return leave(ws);
   if (!room || !room.started) return fail(ws, "You are not in an active room.");
