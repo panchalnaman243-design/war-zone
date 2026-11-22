@@ -23,7 +23,7 @@ WZ.CONFIG = {
        To set a passcode: open the game, open the browser console (F12) and run
            await WZ.sha256("nitin0is0owner")
        then paste the hex string it prints below. The plain phrase is never stored in the code. */
-    ADMIN_PASSCODE_HASH: "",
+    '88214328ce732c35b8937dbe48627b7a6f5142265e3367cdabb41a9877c3e299': "",
 
     FEATURES: {
         multiplayer: true,       // online co-op (needs the server running, see CONFIG.ONLINE_URL)
