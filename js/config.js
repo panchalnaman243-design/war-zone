@@ -23,7 +23,7 @@ WZ.CONFIG = {
        To set a passcode: open the game, open the browser console (F12) and run
            await WZ.sha256("type-your-own-secret-phrase-here")
        then paste the hex string it prints below. The plain phrase is never stored in the code. */
-    ADMIN_PASSCODE_HASH: "ca96187bffa68bb9a336afabbc94636ac82dd62dcc2960d7c912c382687f1cf5",
+    ADMIN_PASSCODE_HASH: "1C2C3C4C5C6C7C8C9C0C",
 
     FEATURES: {
         multiplayer: true,       // online co-op (needs the server running, see CONFIG.ONLINE_URL)
@@ -37,7 +37,7 @@ WZ.CONFIG = {
         waveCoinsMin: 10,        // coins per cleared wave
         waveCoinsMax: 10,
         coinPerKill: 0.5,        // coins per zombie killed (offline; fractions add up, whole coins are paid)
-        xpPerKill: 2,
+        xpPerKill: 4,
         ammoDropChance: 0.07,
         healthDropChance: 0.035
     },
