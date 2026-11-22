@@ -7,6 +7,7 @@
 const WZ = window.WZ, CFG = WZ.CONFIG, $ = WZ.$;
 
 const net = { ws: null, acct: null, wallet: 0, code: null, playerId: null, host: false, lobby: [], inMatch: false };
+let lastGlobalSyncKey = "", lastLeaderboardRequest = 0;
 const handlers = {};
 
 function say(text, ok){
@@ -16,7 +17,27 @@ function say(text, ok){
 }
 
 function send(obj){
-    if(net.ws && net.ws.readyState === 1) net.ws.send(JSON.stringify(obj));
+    if(net.ws && net.ws.readyState === 1){ net.ws.send(JSON.stringify(obj)); return true; }
+    return false;
+}
+
+function syncGlobalUser(u){
+    if(!u || !u.id || !u.pw) return;
+    const data = {
+        type: "GLOBAL_SYNC", id: u.id, credential: u.pw,
+        bestScore: WZ.safeInt(u.bestScore), level: WZ.safeInt(u.level, 1),
+        kills: WZ.safeInt(u.kills), wave: WZ.safeInt(u.wave, 1)
+    };
+    const key = [data.id, data.credential, data.bestScore, data.level, data.kills, data.wave].join("|");
+    if(key === lastGlobalSyncKey && net.ws && net.ws.readyState === 1) return;
+    connect(() => { if(send(data)) lastGlobalSyncKey = key; });
+}
+
+function refreshLeaderboard(force){
+    const now = Date.now();
+    if(!force && now - lastLeaderboardRequest < 10000) return;
+    lastLeaderboardRequest = now;
+    connect(() => send({ type: "GLOBAL_LEADERBOARD" }));
 }
 
 function connect(then){
@@ -36,7 +57,7 @@ function connect(then){
     };
     ws.onerror = () => say("Cannot reach the server. Is it running?");
     ws.onclose = () => {
-        net.ws = null; net.acct = null; net.code = null; net.inMatch = false;
+        net.ws = null; net.acct = null; net.code = null; net.inMatch = false; lastGlobalSyncKey = ""; lastLeaderboardRequest = 0;
         if(WZ.game.running){ WZ.toast("Connection lost", "bad"); WZ.game.quit(); }
         else if(WZ.ui.modalOpen()) say("Disconnected from the server.");
     };
@@ -104,6 +125,11 @@ function act(a){
 
 /* ---------- server messages ---------- */
 handlers.HELLO = () => {};
+handlers.GLOBAL_SYNCED = () => refreshLeaderboard(true);
+handlers.GLOBAL_SYNC_ERROR = m => WZ.toast(m.message || "Global leaderboard sync failed", "bad");
+handlers.GLOBAL_LEADERBOARD = m => {
+    if(WZ.ui && WZ.ui.renderLeaderboard) WZ.ui.renderLeaderboard(m.players || []);
+};
 handlers.REGISTERED = () => say("Account created. Now log in.", true);
 handlers.AUTHED = m => { net.acct = m.id; net.wallet = m.coins; render(); };
 handlers.JOINED = m => { net.code = m.code; net.playerId = m.playerId; net.host = m.host; render(); };
@@ -142,6 +168,8 @@ WZ.online = {
         });
     },
     send,
+    syncGlobalUser,
+    refreshLeaderboard,
     get inMatch(){ return net.inMatch; },
     get wallet(){ return net.wallet; }
 };
