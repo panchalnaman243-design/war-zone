@@ -6,13 +6,16 @@
 const http = require("http");
 const crypto = require("crypto");
 const { WebSocketServer, WebSocket } = require("ws");
+const { Pool } = require("pg");
 
 const PORT = Number(process.env.PORT || 3000);
 const WORLD_W = 1000, WORLD_H = 600, MAX_PLAYERS = 8;
 const accounts = new Map();
-// Main-game accounts synced from every device for the public global leaderboard.
-// This starter implementation is in-memory, like the existing online accounts.
-const globalPlayers = new Map();
+// Persistent global leaderboard. Set DATABASE_URL in the Render service environment.
+const pool = process.env.DATABASE_URL ? new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false }
+}) : null;
 const rooms = new Map();
 const sockets = new Map();
 let nextPlayerId = 1, nextZombieId = 1;
@@ -200,36 +203,51 @@ function checkMatchOver(room) {
   room.players.clear();
   rooms.delete(room.code);
 }
-function onMessage(ws, raw) {
+async function onMessage(ws, raw) {
   let msg;
   try { msg = JSON.parse(raw.toString()); } catch { return fail(ws, "Invalid message."); }
   if (!msg || typeof msg.type !== "string") return fail(ws, "Invalid message.");
-  // Public global leaderboard: IDs and best scores synced by the main game.
+  // Public global leaderboard: read player records from PostgreSQL.
   if (msg.type === "GLOBAL_LEADERBOARD") {
-    const players = [...globalPlayers.entries()]
-      .map(([id, p]) => ({ id, bestScore: p.bestScore, level: p.level, kills: p.kills, wave: p.wave }))
-      .sort((a, b) => b.bestScore - a.bestScore || a.id.localeCompare(b.id))
-      .slice(0, 50);
-    return send(ws, "GLOBAL_LEADERBOARD", { players });
+    if (!pool) return send(ws, "GLOBAL_SYNC_ERROR", { message: "Leaderboard database is not connected yet." });
+    const result = await pool.query(
+      'SELECT player_id AS id, best_score AS "bestScore", level, kills, wave FROM global_players ORDER BY best_score DESC, player_id ASC LIMIT 50'
+    );
+    return send(ws, "GLOBAL_LEADERBOARD", { players: result.rows });
   }
   if (msg.type === "GLOBAL_SYNC") {
+    if (!pool) return send(ws, "GLOBAL_SYNC_ERROR", { message: "Leaderboard database is not connected yet." });
     const id = cleanId(msg.id);
     const credential = String(msg.credential || "");
     if (id.length < 3 || !/^[a-f0-9]{8,128}$/i.test(credential)) {
       return send(ws, "GLOBAL_SYNC_ERROR", { message: "Could not sync this player ID. Please log in again." });
     }
-    let player = globalPlayers.get(id);
-    if (!player) {
-      player = { ...passwordRecord(credential), bestScore: 0, level: 1, kills: 0, wave: 1 };
-      globalPlayers.set(id, player);
-    } else if (!passwordMatches(credential, player)) {
+    let result = await pool.query(
+      "SELECT credential_salt, credential_hash FROM global_players WHERE player_id = $1", [id]
+    );
+    if (!result.rowCount) {
+      const record = passwordRecord(credential);
+      await pool.query(
+        "INSERT INTO global_players (player_id, credential_salt, credential_hash) VALUES ($1, $2, $3) ON CONFLICT (player_id) DO NOTHING",
+        [id, record.salt, record.hash]
+      );
+      result = await pool.query(
+        "SELECT credential_salt, credential_hash FROM global_players WHERE player_id = $1", [id]
+      );
+    }
+    const record = { salt: result.rows[0].credential_salt, hash: result.rows[0].credential_hash };
+    if (!passwordMatches(credential, record)) {
       return send(ws, "GLOBAL_SYNC_ERROR", { message: "This player ID is already registered with a different password on another device." });
     }
-    player.bestScore = Math.max(player.bestScore, Math.max(0, Math.min(1000000000, Number(msg.bestScore) || 0)));
-    player.level = Math.max(player.level, Math.max(1, Math.min(100000, Number(msg.level) || 1)));
-    player.kills = Math.max(player.kills, Math.max(0, Math.min(1000000000, Number(msg.kills) || 0)));
-    player.wave = Math.max(player.wave, Math.max(1, Math.min(100000, Number(msg.wave) || 1)));
-    send(ws, "GLOBAL_SYNCED", { id, bestScore: player.bestScore });
+    const bestScore = Math.max(0, Math.min(1000000000, Number(msg.bestScore) || 0));
+    const level = Math.max(1, Math.min(100000, Number(msg.level) || 1));
+    const kills = Math.max(0, Math.min(1000000000, Number(msg.kills) || 0));
+    const wave = Math.max(1, Math.min(100000, Number(msg.wave) || 1));
+    const saved = await pool.query(
+      "UPDATE global_players SET best_score = GREATEST(best_score, $2), level = GREATEST(level, $3), kills = GREATEST(kills, $4), wave = GREATEST(wave, $5), updated_at = NOW() WHERE player_id = $1 RETURNING best_score",
+      [id, bestScore, level, kills, wave]
+    );
+    send(ws, "GLOBAL_SYNCED", { id, bestScore: saved.rows[0].best_score });
     return;
   }
   if (msg.type === "REGISTER" || msg.type === "LOGIN") {
@@ -267,8 +285,29 @@ function onMessage(ws, raw) {
 }
 wss.on("connection", ws => {
   send(ws, "HELLO");
-  ws.on("message", data => onMessage(ws, data));
+  ws.on("message", data => { onMessage(ws, data).catch(err => { console.error("WebSocket request failed:", err); fail(ws, "Server error. Please try again."); }); });
   ws.on("close", () => leave(ws));
   ws.on("error", () => leave(ws));
 });
-server.listen(PORT, "0.0.0.0", () => console.log("WAR ZONE Online listening on " + PORT));
+async function startServer() {
+  if (pool) {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS global_players (
+        player_id VARCHAR(16) PRIMARY KEY,
+        credential_salt VARCHAR(64) NOT NULL,
+        credential_hash VARCHAR(128) NOT NULL,
+        best_score BIGINT NOT NULL DEFAULT 0,
+        level INTEGER NOT NULL DEFAULT 1,
+        kills BIGINT NOT NULL DEFAULT 0,
+        wave INTEGER NOT NULL DEFAULT 1,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("WAR ZONE leaderboard database connected.");
+  } else {
+    console.warn("DATABASE_URL is missing. Global leaderboard will not persist.");
+  }
+  server.listen(PORT, "0.0.0.0", () => console.log("WAR ZONE Online listening on " + PORT));
+}
+startServer().catch(err => { console.error("Database startup failed:", err); process.exit(1); });
