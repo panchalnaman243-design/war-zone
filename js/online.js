@@ -7,7 +7,8 @@
 const WZ = window.WZ, CFG = WZ.CONFIG, $ = WZ.$;
 
 const net = { ws: null, acct: null, wallet: 0, code: null, playerId: null, host: false, lobby: [], inMatch: false };
-let lastGlobalSyncKey = "", lastLeaderboardRequest = 0;
+const globalSyncKeys = new Map();
+let lastLeaderboardRequest = 0;
 const handlers = {};
 
 function say(text, ok){
@@ -29,8 +30,8 @@ function syncGlobalUser(u){
         kills: WZ.safeInt(u.kills), wave: WZ.safeInt(u.wave, 1)
     };
     const key = [data.id, data.credential, data.bestScore, data.level, data.kills, data.wave].join("|");
-    if(key === lastGlobalSyncKey && net.ws && net.ws.readyState === 1) return;
-    connect(() => { if(send(data)) lastGlobalSyncKey = key; });
+    if(globalSyncKeys.get(data.id) === key && net.ws && net.ws.readyState === 1) return;
+    connect(() => { if(send(data)) globalSyncKeys.set(data.id, key); });
 }
 
 function refreshLeaderboard(force){
@@ -57,7 +58,7 @@ function connect(then){
     };
     ws.onerror = () => say("Cannot reach the server. Is it running?");
     ws.onclose = () => {
-        net.ws = null; net.acct = null; net.code = null; net.inMatch = false; lastGlobalSyncKey = ""; lastLeaderboardRequest = 0;
+        net.ws = null; net.acct = null; net.code = null; net.inMatch = false; globalSyncKeys.clear(); lastLeaderboardRequest = 0;
         if(WZ.game.running){ WZ.toast("Connection lost", "bad"); WZ.game.quit(); }
         else if(WZ.ui.modalOpen()) say("Disconnected from the server.");
     };
