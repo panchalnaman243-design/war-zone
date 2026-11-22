@@ -72,6 +72,8 @@ function logout(){ user = null; WZ.store.setSession(null); cancelAnimationFrame(
 ui.showHome = function(){
     user = WZ.normalizeUser(user); ui.saveUser(user);
     show("home"); updateHome();
+    // Sync every account saved on this device, not only the account currently logged in.
+    if(WZ.online) Object.values(WZ.store.getUsers()).forEach(p => WZ.online.syncGlobalUser(p));
     $("adminBtn").classList.toggle("hidden", !isAdmin());
     $("giftBtn").classList.toggle("hidden", !CFG.FEATURES.gifting);
     $("rewardBtn").classList.toggle("hidden", !CFG.FEATURES.dailyRewards);
