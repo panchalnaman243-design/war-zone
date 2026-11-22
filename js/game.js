@@ -200,6 +200,7 @@ function start(user, online){
     };
     G.map = WZ.MAPS[user.currentMap] || WZ.MAPS.city;
     G.online = online ? { code: online.code, playerId: online.playerId, lastMove: 0, hp: undefined } : null;
+    G.duel = !!(online && online.duel); G.onlineWallet = online && Number(online.wallet) || 0; G.duelWins = [];
     G.remote = [];
     G.maxHp = G.online ? 100 : ch.health + upg("iron_heart") * 10;   // online: server uses 100 hp
     G.hp = G.maxHp;
@@ -224,7 +225,8 @@ function start(user, online){
     G.lastTarget = { x: W * .2, y: H * .55 };
     $("hudGun").src = `assets/guns/${G.skin}.webp`;
     $("hudGunName").textContent = wp.name;
-    beginWave(true);
+    if(G.duel){ G.wave = 1; G.need = 4; G.killsWave = 0; banner("ONLINE 1v1 · ROUND 1"); }
+    else beginWave(true);
     hud(true);
     lastT = performance.now();
     cancelAnimationFrame(raf);
@@ -1129,7 +1131,7 @@ function hud(force){
     });
     set("ammo", G.ammo, v => $("ammoNow").textContent = v);
     set("res", G.reserve, v => $("ammoRes").textContent = "/ " + v);
-    set("coins", G.user.coins, v => $("hudCoins").textContent = WZ.fmt(v));
+    set("coins", G.duel ? G.onlineWallet : G.user.coins, v => $("hudCoins").textContent = WZ.fmt(v));
     set("power", `${Math.round(G.power)}|${G.stock.length}|${G.brewed.length}`, () => {
         $("powerFill").style.width = Math.round(G.power) + "%";
         $("powerText").textContent = G.brewed.length >= ELEM_ORDER.length ? "ALL 4 SERUMS BREWED"
@@ -1309,7 +1311,8 @@ function newNetZombie(z){
 function onNet(s){
     if(!G || !G.online) return;
     const myId = G.online.playerId;
-    G.wave = s.wave; G.need = s.need; G.killsWave = s.killsWave;
+    G.wave = s.round || s.wave || G.wave; G.need = s.maxRounds || s.need || 4; G.killsWave = s.killsWave || 0;
+    if(s.wins) G.duelWins = s.wins;
     const me = s.players.find(p => p.id === myId);
     if(me){
         if(G.online.hp !== undefined && me.hp < G.online.hp){
@@ -1325,7 +1328,7 @@ function onNet(s){
         id: p.id, name: p.name, character: p.character, skin: p.skin,
         x: netX(p.x), y: netY(p.y), facing: p.facing, alive: p.alive }));
     const old = new Map(G.zombies.map(z => [z.id, z]));
-    G.zombies = s.zombies.map(z => {
+    G.zombies = (s.zombies || []).map(z => {
         const o = old.get(z.id) || newNetZombie(z);
         if(z.hp < o.hp - .5) WZ.fx.blood(netX(z.x), netY(z.y), o.h * .55, 0, 12, false);
         o.x = netX(z.x); o.y = netY(z.y); o.hp = z.hp; o.maxhp = z.maxhp;
@@ -1333,8 +1336,45 @@ function onNet(s){
         o.anim += .15;
         return o;
     });
-    G.bullets = s.bullets.map(b => ({ x: netX(b.x), y: netY(b.y), a: b.a, tr: 46 }));
+    G.bullets = (s.bullets || []).map(b => ({ x: netX(b.x), y: netY(b.y), a: b.a, tr: 46 }));
     hud();
+}
+
+function onDuelRound(m){
+    if(!G || !G.duel || ended) return;
+    G.duelWins = m.wins || G.duelWins;
+    const mine = (m.wallets || []).find(p=>p.id === G.online.playerId);
+    if(mine) G.onlineWallet = mine.coins;
+    const text = m.winner ? (m.winner === G.user.id ? "ROUND WON · +10 COINS" : "ROUND LOST · +5 COINS") : "ROUND DRAW · +5 COINS EACH";
+    banner(text); hud(true);
+}
+function onDuelOver(m){
+    if(!G || !G.duel || ended) return;
+    ended = true; running = false; G.online.over = true;
+    G.onlineWallet = Number(m.wallet) || G.onlineWallet;
+    if(m.titleId && m.youWon && !G.user.titles.includes(m.titleId)){
+        G.user.titles.push(m.titleId);
+        if(!G.user.title) G.user.title = m.titleId;
+        WZ.ui.saveUser(G.user);
+        WZ.toast("🏅 TITLE UNLOCKED: " + m.titleName, "good");
+    }
+    const wins = m.wins || [];
+    const my = wins.find(p=>p.id === G.online.playerId);
+    const other = wins.find(p=>p.id !== G.online.playerId);
+    const head = $("overOverlay").querySelector("h2");
+    head.textContent = m.draw ? "MATCH DRAW" : m.youWon ? "VICTORY!" : "DEFEAT";
+    head.classList.toggle("red", !m.youWon && !m.draw);
+    $("overScore").parentElement.querySelector("span").textContent = "YOUR ROUND WINS";
+    $("overScore").textContent = my ? my.wins : 0;
+    $("overBest").parentElement.querySelector("span").textContent = "ONLINE WALLET";
+    $("overBest").textContent = WZ.fmt(G.onlineWallet);
+    $("overWave").textContent = "4";
+    $("overKills").textContent = other ? other.wins : 0;
+    $("overCoins").textContent = m.bonus || 0;
+    $("overOverlay").querySelector(".overGrid .wide span").textContent = "MATCH BONUS";
+    $("againBtn").textContent = "MAIN MENU";
+    WZ.sfx.over(); WZ.haptic(120); hud(true);
+    setTimeout(() => $("overOverlay").classList.remove("hidden"), 500);
 }
 
 /* match finished (or this player left): show the server's numbers */
@@ -1372,7 +1412,7 @@ function drawRemote(r){
 WZ.game = {
     start, pause, resume, quit,
     startOnline(user, info){ start(user, info); },
-    onNet, onMatchOver,
+    onNet, onMatchOver, onDuelRound, onDuelOver,
     get remoteCount(){ return G && G.remote ? G.remote.length : -1; },
     get running(){ return running; },
     get paused(){ return paused; },
