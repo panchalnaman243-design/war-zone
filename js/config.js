@@ -54,7 +54,7 @@ WZ.CONFIG = {
 
     /* online co-op server. On a phone, replace localhost with your PC's LAN IP,
        e.g. ws://192.168.1.20:3000/ws. Use wss:// once the server is on https. */
-    ONLINE_URL: "ws://localhost:3000/ws"
+    ONLINE_URL: "wss://war-zone-online.onrender.com/ws"
 };
 
 /* ---------------------------------------------------------
