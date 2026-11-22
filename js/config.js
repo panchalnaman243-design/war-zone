@@ -21,9 +21,9 @@ WZ.CONFIG = {
     /* Second lock on top of ADMIN_IDS: even in a dev build, admin now also needs this passcode.
        Leave it "" to keep the admin panel fully locked (recommended once you're done testing).
        To set a passcode: open the game, open the browser console (F12) and run
-           await WZ.sha256("type-your-own-secret-phrase-here")
+           await WZ.sha256("nitin0is0owner")
        then paste the hex string it prints below. The plain phrase is never stored in the code. */
-    ADMIN_PASSCODE_HASH: "1C2C3C4C5C6C7C8C9C0C",
+    ADMIN_PASSCODE_HASH: "88214328ce732c35b8937dbe48627b7a6f5142265e3367cdabb41a9877c3e299",
 
     FEATURES: {
         multiplayer: true,       // online co-op (needs the server running, see CONFIG.ONLINE_URL)
