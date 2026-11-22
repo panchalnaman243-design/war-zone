@@ -50,6 +50,13 @@ function passwordMatches(password, record) {
   const actual = crypto.scryptSync(password, record.salt, 64);
   return crypto.timingSafeEqual(actual, Buffer.from(record.hash, "hex"));
 }
+async function persistOnlineAccount(id) {
+  if (!pool) return;
+  const a = accounts.get(id);
+  if (!a) return;
+  await pool.query("UPDATE online_accounts SET coins=$2, titles=$3, updated_at=NOW() WHERE player_id=$1",
+    [id, a.coins, a.titles || []]);
+}
 function playerList(room) {
   return [...room.players.values()].map(p => ({
     id: p.id, name: p.account, character: p.character, skin: p.skin
@@ -213,6 +220,7 @@ function checkMatchOver(room) {
     const coins = p.kills * 2;
     const account = accounts.get(p.account);
     if (account) account.coins += coins;
+    persistOnlineAccount(p.account).catch(err=>console.error("Wallet save failed:",err));
     send(p.ws, "MATCH_OVER", { wave: room.wave, result: { kills: p.kills, coins, wallet: account ? account.coins : 0 } });
   }
   room.players.clear();
@@ -324,7 +332,10 @@ function finishDuel(duel, winner, reason="complete") {
   const special = winner && loser && titleMap[loser.account.toUpperCase()];
   if (winner) {
     const account = accounts.get(winner.account);
-    if (account) account.coins += 50;
+    if (account) {
+      account.coins += 50;
+      if (special && !account.titles.includes(special[0])) account.titles.push(special[0]);
+    }
   }
   for (const p of players) {
     const account = accounts.get(p.account);
@@ -337,8 +348,10 @@ function finishDuel(duel, winner, reason="complete") {
       wallet: account ? account.coins : 0,
       bonus: winner && p === winner ? 50 : 0,
       titleId: winner && p === winner && special ? special[0] : null,
-      titleName: winner && p === winner && special ? special[1] : null
+      titleName: winner && p === winner && special ? special[1] : null,
+      titles: accounts.get(p.account)?.titles || []
     });
+    persistOnlineAccount(p.account).catch(err=>console.error("Duel wallet save failed:",err));
   }
   stopDuel(duel);
 }
@@ -348,6 +361,7 @@ function endDuelRound(duel, winner) {
   for (const p of players) {
     const account = accounts.get(p.account);
     if (account) account.coins += winner ? (p === winner ? 10 : 5) : 5;
+    persistOnlineAccount(p.account).catch(err=>console.error("Duel round wallet save failed:",err));
   }
   if (winner) winner.wins++;
   const leader = players.find(p=>p.wins>=3);
@@ -440,13 +454,29 @@ async function onMessage(ws, raw) {
     if (id.length < 3 || pw.length < 4 || pw.length > 64) return fail(ws, "Use an ID of 3-16 letters/numbers and a password of 4-64 characters.");
     if (msg.type === "REGISTER") {
       if (accounts.has(id)) return fail(ws, "That online ID is already taken.");
-      accounts.set(id, { ...passwordRecord(pw), coins: 0 });
+      const record = passwordRecord(pw);
+      if (pool) {
+        const saved = await pool.query(
+          "INSERT INTO online_accounts (player_id, credential_salt, credential_hash) VALUES ($1,$2,$3) ON CONFLICT (player_id) DO NOTHING RETURNING player_id",
+          [id, record.salt, record.hash]
+        );
+        if (!saved.rowCount) return fail(ws, "That online ID is already taken.");
+      }
+      accounts.set(id, { ...record, coins: 0, titles: [] });
       return send(ws, "REGISTERED");
     }
-    const account = accounts.get(id);
+    let account = accounts.get(id);
+    if (!account && pool) {
+      const saved = await pool.query("SELECT credential_salt, credential_hash, coins, titles FROM online_accounts WHERE player_id=$1", [id]);
+      if (saved.rowCount) account = {
+        salt:saved.rows[0].credential_salt, hash:saved.rows[0].credential_hash,
+        coins:Number(saved.rows[0].coins)||0, titles:saved.rows[0].titles||[]
+      };
+      if (account) accounts.set(id, account);
+    }
     if (!account || !passwordMatches(pw, account)) return fail(ws, "Incorrect online ID or password.");
-    send(ws, "AUTHED", { id, coins: account.coins });
-    sockets.set(ws, { account: id, room: null });
+    send(ws, "AUTHED", { id, coins: account.coins, titles: account.titles || [] });
+    sockets.set(ws, { account: id, room: null, duelQueue:false, duel:null });
     return;
   }
   if (msg.type === "DUEL_QUEUE") return queueDuel(ws, msg);
@@ -488,6 +518,17 @@ async function startServer() {
         level INTEGER NOT NULL DEFAULT 1,
         kills BIGINT NOT NULL DEFAULT 0,
         wave INTEGER NOT NULL DEFAULT 1,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS online_accounts (
+        player_id VARCHAR(16) PRIMARY KEY,
+        credential_salt VARCHAR(64) NOT NULL,
+        credential_hash VARCHAR(128) NOT NULL,
+        coins BIGINT NOT NULL DEFAULT 0,
+        titles TEXT[] NOT NULL DEFAULT '{}',
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
