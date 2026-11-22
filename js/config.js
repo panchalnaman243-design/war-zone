@@ -26,7 +26,7 @@ WZ.CONFIG = {
     ADMIN_PASSCODE_HASH: "0597bfd6817f8ccf7bb9ef321a85b889a84b3511617e0d0ad684af0af5418d47",
 
     FEATURES: {
-        multiplayer: true,       // online co-op (needs the server running, see CONFIG.ONLINE_URL)
+        multiplayer: true,       // online co-op (needs the server running, see CONFIG.ONLINE_URL: "wss://war-zone-online-qkl1.onrender.com/ws",)
         gifting: true,
         dailyRewards: true,
         puzzles: false          // wave-end puzzles (and the POWER they give). Set true to bring them back
