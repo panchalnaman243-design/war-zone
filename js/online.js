@@ -28,9 +28,17 @@ function syncGlobalUser(u){
         type: "GLOBAL_SYNC", id: u.id, credential: u.pw,
         bestScore: WZ.safeInt(u.bestScore), level: WZ.safeInt(u.level, 1),
         kills: WZ.safeInt(u.kills), wave: WZ.safeInt(u.wave, 1),
-        xp: WZ.safeInt(u.xp), coins: WZ.safeInt(u.coins)
+        xp: WZ.safeInt(u.xp), coins: WZ.safeInt(u.coins),
+        loadout: {
+            ownedCharacters: u.ownedCharacters || [], character: u.character,
+            ownedWeapons: u.ownedWeapons || [], weapon: u.weapon,
+            ownedSkins: u.ownedSkins || [], skin: u.skin || {},
+            titles: u.titles || [], title: u.title,
+            upgrades: u.upgrades || {},
+            unlockedMaps: u.unlockedMaps || [], currentMap: u.currentMap
+        }
     };
-    const key = [data.id, data.credential, data.bestScore, data.level, data.kills, data.wave].join("|");
+    const key = JSON.stringify(data);
     if(globalSyncKeys.get(data.id) === key && net.ws && net.ws.readyState === 1) return;
     connect(() => { if(send(data)) globalSyncKeys.set(data.id, key); });
 }
@@ -141,11 +149,9 @@ function act(a){
 handlers.HELLO = () => {};
 handlers.GLOBAL_SYNCED = m => {
     refreshLeaderboard(true);
-    const users = WZ.store.getUsers();
-    const saved = users[m.id];
+    const users = WZ.store.getUsers(), saved = users[m.id];
     if(!saved) return;
-    const oldLevel = WZ.safeInt(saved.level, 1);
-    const cloudLevel = WZ.safeInt(m.level, 1);
+    const oldLevel = WZ.safeInt(saved.level, 1), cloudLevel = WZ.safeInt(m.level, 1);
     const next = {
         bestScore: Math.max(WZ.safeInt(saved.bestScore), WZ.safeInt(m.best_score)),
         level: Math.max(oldLevel, cloudLevel),
@@ -155,14 +161,34 @@ handlers.GLOBAL_SYNCED = m => {
     };
     next.xp = cloudLevel > oldLevel ? WZ.safeInt(m.xp) :
         cloudLevel === oldLevel ? Math.max(WZ.safeInt(saved.xp), WZ.safeInt(m.xp)) : WZ.safeInt(saved.xp);
-    const changed = Object.keys(next).some(k => WZ.safeInt(saved[k]) !== next[k]);
+    const cloud = m.loadout || {};
+    const union = (a,b,valid) => [...new Set([...(Array.isArray(a)?a:[]), ...(Array.isArray(b)?b:[])].filter(valid))];
+    next.ownedCharacters = union(saved.ownedCharacters, cloud.ownedCharacters, id => !!WZ.CHARACTERS[id]);
+    next.ownedWeapons = union(saved.ownedWeapons, cloud.ownedWeapons, id => !!WZ.WEAPONS[id]);
+    next.ownedSkins = union(saved.ownedSkins, cloud.ownedSkins, id => !!WZ.SKINS[id]);
+    next.titles = union(saved.titles, cloud.titles, id => WZ.TITLES.some(t => t.id === id));
+    next.unlockedMaps = union(saved.unlockedMaps, cloud.unlockedMaps, id => !!WZ.MAPS[id]);
+    next.skin = { ...(saved.skin || {}), ...(cloud.skin || {}) };
+    Object.keys(next.skin).forEach(w => {
+        const id = next.skin[w];
+        if (!WZ.WEAPONS[w] || !WZ.SKINS[id] || WZ.SKINS[id].weapon !== w || !next.ownedSkins.includes(id)) delete next.skin[w];
+    });
+    next.upgrades = { ...(saved.upgrades || {}) };
+    Object.entries(cloud.upgrades || {}).forEach(([id,v]) => {
+        if (WZ.UPGRADES.some(x => x.id === id)) next.upgrades[id] = Math.max(WZ.safeInt(next.upgrades[id]), WZ.safeInt(v));
+    });
+    next.character = next.ownedCharacters.includes(cloud.character) ? cloud.character : saved.character;
+    next.weapon = next.ownedWeapons.includes(cloud.weapon) ? cloud.weapon : saved.weapon;
+    next.title = next.titles.includes(cloud.title) ? cloud.title : saved.title;
+    next.currentMap = next.unlockedMaps.includes(cloud.currentMap) ? cloud.currentMap : saved.currentMap;
+    const changed = Object.keys(next).some(k => JSON.stringify(saved[k]) !== JSON.stringify(next[k]));
     if(!changed) return;
     Object.assign(saved, next);
+    users[m.id] = WZ.normalizeUser(saved);
     WZ.store.saveUsers(users);
     const current = WZ.ui.currentUser();
     if(current && current.id === m.id) {
         Object.assign(current, next);
-        WZ.ui.saveUser(current);
         WZ.ui.showHome();
     }
 };
