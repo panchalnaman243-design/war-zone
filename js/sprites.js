@@ -15,6 +15,7 @@ WZ.assets = {
         const l = [];
         Object.keys(A.characters).forEach(c => ["body", "hands", "full"].forEach(p =>
             l.push([`${c}_${p}`, `assets/characters/${c}_${p}.webp`])));
+        l.push(["void_reaper_full", "assets/Soul%20Reaper.webp"]);
         Object.keys(A.guns).forEach(g => l.push([g, `assets/guns/${g}.webp`]));
         return l;
     },
@@ -84,6 +85,13 @@ function geometry(o){
 
 function drawFighter(ctx, o){
     const G = geometry(o);
+    if(o.char === "void_reaper" && IMG.void_reaper_full){
+        const im = IMG.void_reaper_full, h = o.h, w = h * (im.width / im.height);
+        ctx.save(); ctx.globalAlpha = o.hurt > 0 ? 0.8 : 1;
+        ctx.translate(o.x, o.y + (o.bob || 0)); ctx.scale(o.facing < 0 ? -1 : 1, 1);
+        ctx.drawImage(im, -w / 2, -h, w, h); ctx.restore();
+        return G;
+    }
     const { k, cm, gm } = G;
     const artChar = o.char === "void_reaper" ? "hitman" : o.char;
     const body = IMG[artChar + "_body"], hands = IMG[artChar + "_hands"], gun = IMG[o.skin];
