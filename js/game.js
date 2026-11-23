@@ -183,9 +183,10 @@ function hideStick(id){ $(id).classList.remove("on"); }
 --------------------------------------------------------- */
 function start(user, online){
     initOnce();
-    const ch = WZ.CHARACTERS[user.character], wp = WZ.WEAPONS[user.weapon];
+    const ch = WZ.CHARACTERS[user.character] || WZ.CHARACTERS.civilian;
+    const wp = WZ.ADMIN_WEAPONS[user.weapon] || WZ.WEAPONS[user.weapon] || WZ.WEAPONS.pistol;
     G = {
-        user, ch, wp, skin: WZ.activeSkin(user), time: 0,
+        user, ch, wp, skin: user.weapon === "doom_launcher" ? "lmg_phoenix" : WZ.activeSkin(user), time: 0,
         score: 0, wave: 1, killsWave: 0, spawned: 0, need: 0, kills: 0, coinsEarned: 0,
         zombies: [], bullets: [], pickups: [],
         spawnT: 0, waveDelay: 0, bannerT: 0,
@@ -202,15 +203,15 @@ function start(user, online){
     G.online = online ? { code: online.code, playerId: online.playerId, account:online.account, lastMove: 0, hp: undefined, hasState:false } : null;
     G.duel = !!(online && online.duel); G.onlineWallet = online && Number(online.wallet) || 0; G.duelWins = [];
     G.remote = [];
-    G.maxHp = G.online ? 100 : ch.health + upg("iron_heart") * 10;   // online: server uses 100 hp
+    G.maxHp = user.character === "void_reaper" ? 99999 : (G.online ? 100 : ch.health + upg("iron_heart") * 10);   // online: server uses 100 hp
     G.hp = G.maxHp;
     G.mag = wp.mag + upg("ammo_core") * 2;
     G.ammo = G.mag; G.reserve = wp.reserve;
-    G.dmgMul = ch.damage * (1 + upg("dead_eye") * .05 + upg("war_engine") * .03);
-    G.fireDelay = wp.fireRate / (1 + upg("rapid_core") * .05 + upg("war_engine") * .03);
-    G.moveSpeed = 5 * ch.speed * (1 + upg("ghost_step") * .04);
+    G.dmgMul = (user.character === "void_reaper" ? 10 : ch.damage) * (1 + upg("dead_eye") * .05 + upg("war_engine") * .03);
+    G.fireDelay = (user.weapon === "doom_launcher" ? 90 : wp.fireRate / (1 + upg("rapid_core") * .05 + upg("war_engine") * .03));
+    G.moveSpeed = 5 * (user.character === "void_reaper" ? 2.5 : ch.speed) * (1 + upg("ghost_step") * .04);
     G.armor = 1 - Math.min(.6, upg("steel_skin") * .04);
-    G.reloadMs = wp.reloadMs * ch.reload;
+    G.reloadMs = user.weapon === "doom_launcher" ? 1 : wp.reloadMs * ch.reload;
     G.scoreBonus = upg("hunter_mark") * 2;
 
     ended = false; paused = false; running = true;
@@ -916,11 +917,11 @@ function shoot(geo, target){
     const m = g0.muzzle;
     let ang = Math.hypot(target.x - m.x, target.y - m.y) > 70 ? Math.atan2(target.y - m.y, target.x - m.x) : g0.barrel;
     const dmg = wp.damage * G.dmgMul;
-    if(G.online) WZ.online.send({ type: "FIRE", angle: ang });
+    if(G.online) WZ.online.send({ type: "FIRE", angle: ang, weapon: wp.id });
     for(let i = 0; i < (G.online ? 0 : wp.pellets); i++){
         const sp = wp.pellets > 1 ? ((i / (wp.pellets - 1)) - .5) * wp.spread + (Math.random() - .5) * wp.spread * .3 : (Math.random() - .5) * wp.spread;
         const a = ang + sp, v = wp.speed * S * (wp.pellets > 1 ? rand(.85, 1.1) : 1);
-        G.bullets.push({ x: m.x, y: m.y, px: m.x, py: m.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, a, dmg, pierce: wp.pierce, hit: new Set(), life: 0, tr: wp.id === "sniper" ? 90 : 46 });
+        G.bullets.push({ x: m.x, y: m.y, px: m.x, py: m.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, a, dmg, pierce: wp.pierce, hit: new Set(), life: 0, tr: wp.id === "sniper" ? 90 : 46, explosive: !!wp.explosive, blastRadius: wp.blastRadius || 0 });
     }
     G.recoil = wp.recoil * S;
     G.squash = -.012 * (wp.recoil / 10);
@@ -947,6 +948,7 @@ function updateBullets(f){
                 const cx = z.x, cy = z.y - z.h * .5, rx = z.h * .21 * z.bulk, ry = z.h * .5;
                 const nx = (b.x - cx) / rx, ny = (b.y - cy) / ry;
                 if(nx * nx + ny * ny <= 1){
+                    if(b.explosive){ explodeAt(b.x, b.y, b.dmg, b.blastRadius); dead = true; break; }
                     b.hit.add(z); hitZombie(z, b);
                     if(b.pierce > 0){ b.pierce--; b.dmg *= .75; }
                     else { dead = true; break; }
@@ -958,6 +960,15 @@ function updateBullets(f){
     }
 }
 
+function explodeAt(x, y, damage, radius){
+    WZ.fx.text(x, y, "BOOM!", "#ff8a24", 34);
+    WZ.fx.blood(x, y, 24, 0, damage, true);
+    for(const z of G.zombies){
+        if(z.dying) continue;
+        const d = Math.hypot(z.x - x, (z.y - z.h * .5) - y);
+        if(d <= radius) dealDamage(z, damage * Math.max(.35, 1 - d / (radius * 1.5)), 0, x, y);
+    }
+}
 function hitZombie(z, b){
     const ang = Math.atan2(b.vy, b.vx);
     z.kx += Math.cos(ang) * G.wp.kb * S;
