@@ -99,7 +99,7 @@ function updateHome(){
     $("waveView").textContent = u.wave;
     $("killsView").textContent = fmt(u.kills);
     $("heroName").textContent = WZ.CHARACTERS[u.character].name;
-    $("heroGun").textContent = WZ.WEAPONS[u.weapon].name + " · " + WZ.SKINS[WZ.activeSkin(u)].name;
+    $("heroGun").textContent = u.weapon === "doom_launcher" ? "DOOM LAUNCHER · ADMIN" : WZ.WEAPONS[u.weapon].name + " · " + WZ.SKINS[WZ.activeSkin(u)].name;
 
     const m = WZ.MISSIONS[u.missionIndex % WZ.MISSIONS.length];
     const prog = missionProgress(m);
