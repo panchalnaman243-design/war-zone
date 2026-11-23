@@ -331,6 +331,7 @@ const TERM_HELP = [
     "/give <ID> <n>       send n coins to another local player",
     "/unlock              unlock every character, gun and skin",
     "/maxupg              set every upgrade to level 10",
+    "/power               open the secret admin power shop",
     "/stats               my level, coins and best score",
     "/players             list local players",
     "/ban <ID>            block an account from logging in on this device",
@@ -347,6 +348,7 @@ function termRun(line){
     const out = [];
     if(!cmd) return out;
     if(cmd === "help") return TERM_HELP.slice();
+    if(cmd === "power") { openAdminPowerShop(); return ["ADMIN POWER SHOP OPENED"]; }
     if(cmd === "clear") return null;
     if(cmd === "ban" || cmd === "unban"){
         const id = WZ.normalizeId(args[0]);
@@ -424,6 +426,30 @@ function termPrint(lines){
     box.scrollTop = box.scrollHeight;
 }
 
+function openAdminPowerShop(){
+    if(!isAdmin() || !adminUnlocked) return;
+    const gun = WZ.ADMIN_WEAPONS.doom_launcher;
+    const hero = WZ.ADMIN_CHARACTERS.void_reaper;
+    openModal("⚡ ADMIN POWER SHOP", `
+        <div class="infoCard"><h3>RESTRICTED ARMOURY</h3><p>Only NITIN, NAMAN and LOVEKESH can equip these items. Not part of the public shop.</p></div>
+        <div class="shopGrid">
+            <div class="shopItem legendary">
+                <span class="badge legendary">ADMIN ONLY</span>
+                <div class="itemVisual gun"><img src="assets/guns/lmg_phoenix.webp" alt="Doom Launcher"></div>
+                <div class="itemName">${gun.name}</div><div class="itemDesc">Explosive rounds · maximum damage · huge blast radius · unlimited reserve.</div>
+                <div class="bars">${bar("DAMAGE",100)}${bar("BLAST",100)}${bar("AMMO",100)}${bar("RATE",100)}</div>
+                <button class="shopAction equip" data-act="powerEquip" data-arg="doom_launcher">${user.weapon === "doom_launcher" ? "✔ EQUIPPED" : "EQUIP WEAPON"}</button>
+            </div>
+            <div class="shopItem legendary">
+                <span class="badge legendary">ADMIN ONLY</span>
+                <div class="itemVisual" style="height:190px"><img src="assets/characters/hitman_full.webp" alt="Void Reaper"></div>
+                <div class="itemName">${hero.name}</div><div class="itemDesc">Black-armour elite · crimson aura · maximum health, speed and damage.</div>
+                <div class="bars">${bar("SPEED",100)}${bar("HEALTH",100)}${bar("DAMAGE",100)}${bar("RELOAD",100)}</div>
+                <button class="shopAction equip" data-act="powerEquip" data-arg="void_reaper">${user.character === "void_reaper" ? "✔ EQUIPPED" : "EQUIP CHARACTER"}</button>
+            </div>
+        </div>
+        <p class="tiny muted">Type /power again in the admin terminal any time to reopen this shop.</p>`, true);
+}
 function openAdmin(){
     if(!isAdmin()) return;
     if(!CFG.ADMIN_PASSCODE_HASH){
@@ -504,6 +530,17 @@ const A = {
     },
     toggle: k => { WZ.settings[k] = !WZ.settings[k]; WZ.saveSettings(); ui.openSettings(); },
     blood: v => { WZ.settings.blood = +v; WZ.saveSettings(); ui.openSettings(); },
+    powerEquip: id => {
+        if(!isAdmin() || !adminUnlocked) return;
+        if(id === "doom_launcher"){
+            user.ownedWeapons = [...new Set([...(user.ownedWeapons || []), id])];
+            user.weapon = id;
+        } else if(id === "void_reaper"){
+            user.ownedCharacters = [...new Set([...(user.ownedCharacters || []), id])];
+            user.character = id;
+        } else return;
+        ui.saveUser(); updateHome(); openAdminPowerShop();
+    },
     adminUnlock: async () => {
         const entered = $("adminPass").value;
         const hash = await WZ.sha256(entered);
