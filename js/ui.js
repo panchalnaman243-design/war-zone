@@ -13,7 +13,7 @@ function show(id){ ["auth", "home", "game"].forEach(s => $(s).classList.toggle("
 /* "Candidate" check only - matching one of ADMIN_IDS is not enough on its own, see openAdmin(). */
 const isAdmin = () => CFG.BUILD === "dev" && user && CFG.ADMIN_IDS.includes(user.id);
 WZ.cheats = { god: false };   // dev-only toggles set from the admin terminal
-let adminUnlocked = false;   // resets on every reload - never persisted, never saved to the user record
+let adminUnlocked = false;   // passcode gate is per session; purchased admin gear is saved on the account
 
 /* ---------------------------------------------------------
    PERSISTENCE
@@ -119,7 +119,7 @@ ui.renderLeaderboard = function(players){
 ui.currentUser = () => user;
 ui.canUseAdminPower = () => isAdmin() && adminUnlocked;
 function guardAdminLoadout(){
-    if((user.weapon === "doom_launcher" || user.character === "void_reaper") && !ui.canUseAdminPower()){
+    if((user.weapon === "doom_launcher" && !(isAdmin() && user.ownedWeapons.includes("doom_launcher"))) || (user.character === "void_reaper" && !(isAdmin() && user.ownedCharacters.includes("void_reaper")))){
         if(user.weapon === "doom_launcher") user.weapon = "pistol";
         if(user.character === "void_reaper") user.character = "civilian";
         ui.saveUser(); updateHome(); WZ.toast("Admin Power Shop is locked. Unlock the admin panel first.", "bad");
@@ -445,15 +445,15 @@ function openAdminPowerShop(){
         <div class="shopGrid">
             <div class="shopItem legendary">
                 <span class="badge legendary">ADMIN ONLY</span>
-                <div class="itemVisual gun"><img src="assets/guns/lmg_phoenix.webp" alt="Doom Launcher"></div>
+                <div class="itemVisual gun"><img src="assets/Doom%20Launcher.webp" alt="Doom Launcher"></div>
                 <div class="itemName">${gun.name}</div><div class="itemDesc">Explosive rounds · maximum damage · huge blast radius · unlimited reserve.</div>
                 <div class="bars">${bar("DAMAGE",100)}${bar("BLAST",100)}${bar("AMMO",100)}${bar("RATE",100)}</div>
                 <button class="shopAction equip" data-act="powerEquip" data-arg="doom_launcher">${user.weapon === "doom_launcher" ? "✔ EQUIPPED" : "EQUIP WEAPON"}</button>
             </div>
             <div class="shopItem legendary">
                 <span class="badge legendary">ADMIN ONLY</span>
-                <div class="itemVisual" style="height:190px"><img src="assets/characters/hitman_full.webp" alt="Void Reaper"></div>
-                <div class="itemName">${hero.name}</div><div class="itemDesc">Black-armour elite · crimson aura · maximum health, speed and damage.</div>
+                <div class="itemVisual" style="height:190px"><img src="assets/Soul%20Reaper.webp" alt="Soul Reaper"></div>
+                <div class="itemName">SOUL REAPER</div><div class="itemDesc">Black-armour elite · crimson aura · maximum health, speed and damage.</div>
                 <div class="bars">${bar("SPEED",100)}${bar("HEALTH",100)}${bar("DAMAGE",100)}${bar("RELOAD",100)}</div>
                 <button class="shopAction equip" data-act="powerEquip" data-arg="void_reaper">${user.character === "void_reaper" ? "✔ EQUIPPED" : "EQUIP CHARACTER"}</button>
             </div>
@@ -546,9 +546,11 @@ const A = {
             user.ownedWeapons = [...new Set([...(user.ownedWeapons || []), id])];
             user.weapon = id;
             user.skin = user.skin || {}; user.skin.doom_launcher = "lmg_phoenix";
+            user.adminPowerUnlocked = true;
         } else if(id === "void_reaper"){
             user.ownedCharacters = [...new Set([...(user.ownedCharacters || []), id])];
             user.character = id;
+            user.adminPowerUnlocked = true;
         } else return;
         ui.saveUser(); updateHome(); openAdminPowerShop();
     },
