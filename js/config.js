@@ -96,6 +96,14 @@ WZ.WEAPONS = {
 };
 WZ.WEAPON_ORDER = ["pistol", "rifle", "smg", "shotgun", "sniper", "lmg"];
 
+// Admin-only gear. These IDs are deliberately NOT added to the regular shop order.
+WZ.ADMIN_WEAPONS = {
+    doom_launcher: { id:"doom_launcher", name:"DOOM LAUNCHER", price:0, damage:9999, fireRate:180, mag:999, reserve:9999, speed:16, pellets:1, spread:0, pierce:99, reloadMs:1, recoil:22, shake:5, kb:18, explosive:true, blastRadius:190 }
+};
+WZ.ADMIN_CHARACTERS = {
+    void_reaper: { id:"void_reaper", name:"VOID REAPER", price:0, speed:2.5, health:99999, damage:10, reload:.1, bio:"A black-armoured legend surrounded by a crimson energy aura." }
+};
+
 /* ---------------------------------------------------------
    GUN SKINS  (art files live in assets/guns/<img>.webp)
    Add a new skin: drop a PNG/WEBP in assets/guns, add an entry
@@ -138,6 +146,7 @@ WZ.CHARACTERS = {
     hitman:   { id: "hitman",   name: "HITMAN",   price: 100000, speed: 1.14, health: 100, damage: 1.30, reload: .82,
                 bio: "Quiet. Precise. Expensive." }
 };
+WZ.CHARACTERS.void_reaper = WZ.ADMIN_CHARACTERS.void_reaper;
 WZ.CHARACTER_ORDER = ["civilian", "cowboy", "soldier", "hitman"];
 
 /* ---------------------------------------------------------
