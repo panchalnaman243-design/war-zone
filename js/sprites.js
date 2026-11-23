@@ -53,7 +53,8 @@ WZ.tinted = tinted;
          hurt (0..1), squash }
 --------------------------------------------------------- */
 function geometry(o){
-    const cm = A.characters[o.char], gm = A.guns[o.skin];
+    const artChar = o.char === "void_reaper" ? "hitman" : o.char;
+    const cm = A.characters[artChar], gm = A.guns[o.skin];
     const k = o.h / cm.h, bob = o.bob || 0;
     const f = o.facing;
     const toWorld = (sx, sy) => ({ x: o.x + f * (sx - cm.pivotX) * k, y: o.y + bob + (sy - cm.feetY) * k });
@@ -84,7 +85,8 @@ function geometry(o){
 function drawFighter(ctx, o){
     const G = geometry(o);
     const { k, cm, gm } = G;
-    const body = IMG[o.char + "_body"], hands = IMG[o.char + "_hands"], gun = IMG[o.skin];
+    const artChar = o.char === "void_reaper" ? "hitman" : o.char;
+    const body = IMG[artChar + "_body"], hands = IMG[artChar + "_hands"], gun = IMG[o.skin];
     if(!body) return G;
 
     // ground shadow
@@ -100,7 +102,7 @@ function drawFighter(ctx, o){
     ctx.drawImage(body, -cm.pivotX, -cm.feetY);
     if(o.hurt > 0){
         ctx.globalAlpha = Math.min(.65, o.hurt);
-        ctx.drawImage(tinted(o.char + "_body_red", body, "#ff2a2a"), -cm.pivotX, -cm.feetY);
+        ctx.drawImage(tinted(artChar + "_body_red", body, "#ff2a2a"), -cm.pivotX, -cm.feetY);
         ctx.globalAlpha = 1;
     }
     // gun sits between body and gloves so the fingers wrap around the grip
@@ -116,7 +118,7 @@ function drawFighter(ctx, o){
         ctx.drawImage(hands, -cm.pivotX, -cm.feetY);
         if(o.hurt > 0){
             ctx.globalAlpha = Math.min(.65, o.hurt);
-            ctx.drawImage(tinted(o.char + "_hands_red", hands, "#ff2a2a"), -cm.pivotX, -cm.feetY);
+            ctx.drawImage(tinted(artChar + "_hands_red", hands, "#ff2a2a"), -cm.pivotX, -cm.feetY);
             ctx.globalAlpha = 1;
         }
     }
