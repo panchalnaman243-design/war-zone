@@ -447,11 +447,13 @@ async function onMessage(ws, raw) {
     const level = Math.max(1, Math.min(100000, Number(msg.level) || 1));
     const kills = Math.max(0, Math.min(1000000000, Number(msg.kills) || 0));
     const wave = Math.max(1, Math.min(100000, Number(msg.wave) || 1));
+    const xp = Math.max(0, Math.min(1000000000, Number(msg.xp) || 0));
+    const coins = Math.max(0, Math.min(1000000000, Number(msg.coins) || 0));
     const saved = await pool.query(
-      "UPDATE global_players SET best_score = GREATEST(best_score, $2), level = GREATEST(level, $3), kills = GREATEST(kills, $4), wave = GREATEST(wave, $5), updated_at = NOW() WHERE player_id = $1 RETURNING best_score",
-      [id, bestScore, level, kills, wave]
+      "UPDATE global_players SET best_score = GREATEST(best_score, $2), xp = CASE WHEN $3 > level THEN $6 WHEN $3 = level THEN GREATEST(xp, $6) ELSE xp END, level = GREATEST(level, $3), kills = GREATEST(kills, $4), wave = GREATEST(wave, $5), coins = GREATEST(coins, $7), updated_at = NOW() WHERE player_id = $1 RETURNING best_score, level, xp, kills, wave, coins",
+      [id, bestScore, level, kills, wave, xp, coins]
     );
-    send(ws, "GLOBAL_SYNCED", { id, bestScore: saved.rows[0].best_score });
+    send(ws, "GLOBAL_SYNCED", { id, ...saved.rows[0] });
     return;
   }
   if (msg.type === "REGISTER" || msg.type === "LOGIN") {
@@ -530,6 +532,8 @@ async function startServer() {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
+    await pool.query("ALTER TABLE global_players ADD COLUMN IF NOT EXISTS xp INTEGER NOT NULL DEFAULT 0");
+    await pool.query("ALTER TABLE global_players ADD COLUMN IF NOT EXISTS coins BIGINT NOT NULL DEFAULT 0");
     await pool.query(`
       CREATE TABLE IF NOT EXISTS online_accounts (
         player_id VARCHAR(16) PRIMARY KEY,
