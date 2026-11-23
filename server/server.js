@@ -106,20 +106,23 @@ function broadcast(room, type, data = {}) {
 function lobby(room) {
   broadcast(room, "LOBBY", { code: room.code, host: room.host, players: playerList(room) });
 }
-function attach(ws, room, account, character, skin) {
+function attach(ws, room, account, character, skin, weapon) {
   if (room.players.size >= MAX_PLAYERS) return fail(ws, "This room is full.");
   const player = {
-    id: nextPlayerId++, ws, account, character: safeCharacter(character), skin: safeSkin(skin),
+    id: nextPlayerId++, ws, account, character: safeCharacter(character, account), skin: safeSkin(skin), weapon: safeWeapon(weapon, account), admin: ADMIN_ACCOUNT_IDS.has(account),
     x: 160 + Math.random() * 680, y: 250 + Math.random() * 260,
     facing: 1, hp: 100, ammo: 30, alive: true, kills: 0,
     lastFire: 0, reloadAt: 0
   };
+  if(player.character === "void_reaper") player.hp = 99999;
+  if(player.weapon === "doom_launcher") player.ammo = 999;
   room.players.set(ws, player);
   sockets.set(ws, { account, room });
   send(ws, "JOINED", { code: room.code, playerId: player.id, host: room.host === account });
   lobby(room);
 }
-function safeCharacter(v) { return ["civilian", "cowboy", "soldier", "hitman"].includes(v) ? v : "civilian"; }
+function safeCharacter(v, account) { return v === "void_reaper" && ADMIN_ACCOUNT_IDS.has(account) ? v : (["civilian", "cowboy", "soldier", "hitman"].includes(v) ? v : "civilian"); }
+function safeWeapon(v, account) { return v === "doom_launcher" && ADMIN_ACCOUNT_IDS.has(account) ? v : "pistol"; }
 function safeSkin(v) {
   return /^(pistol|rifle|smg|shotgun|sniper|lmg)_[a-z0-9_]+$/.test(String(v || "")) ? String(v) : "pistol_std";
 }
@@ -168,7 +171,7 @@ function createRoom(ws, msg) {
   const code = makeCode();
   const room = { code, host: info.account, players: new Map(), started: false, wave: 1, need: 6, killsWave: 0, zombies: [], bullets: [], spawnLeft: 6, spawnAt: 0, timer: null };
   rooms.set(code, room);
-  attach(ws, room, info.account, msg.character, msg.skin);
+  attach(ws, room, info.account, msg.character, msg.skin, msg.weapon);
 }
 function joinRoom(ws, msg) {
   const info = sockets.get(ws);
@@ -177,7 +180,7 @@ function joinRoom(ws, msg) {
   const room = rooms.get(String(msg.code || "").toUpperCase());
   if (!room) return fail(ws, "Room not found. Check the code.");
   if (room.started) return fail(ws, "That match has already started.");
-  attach(ws, room, info.account, msg.character, msg.skin);
+  attach(ws, room, info.account, msg.character, msg.skin, msg.weapon);
 }
 function startMatch(ws) {
   const info = sockets.get(ws), room = info && info.room;
@@ -188,7 +191,7 @@ function startMatch(ws) {
   room.started = true;
   room.zombies = []; room.bullets = [];
   room.spawnLeft = room.need;
-  for (const p of room.players.values()) { p.hp = 100; p.ammo = 30; p.alive = true; p.kills = 0; }
+  for (const p of room.players.values()) { p.hp = p.character === "void_reaper" ? 99999 : 100; p.ammo = p.weapon === "doom_launcher" ? 999 : 30; p.alive = true; p.kills = 0; }
   broadcast(room, "MATCH_START");
   room.timer = setInterval(() => tick(room), 50);
 }
@@ -197,7 +200,8 @@ function fire(room, player, angle) {
   if (!player.alive || player.ammo <= 0 || now - player.lastFire < 180) return;
   if (!Number.isFinite(angle)) return;
   player.lastFire = now; player.ammo--;
-  room.bullets.push({ owner: player.id, x: player.x, y: player.y - 35, vx: Math.cos(angle) * 17, vy: Math.sin(angle) * 17, life: 70, damage: 25 });
+  const adminGun = player.admin && player.weapon === "doom_launcher";
+  room.bullets.push({ owner: player.id, x: player.x, y: player.y - 35, vx: Math.cos(angle) * (adminGun ? 19 : 17), vy: Math.sin(angle) * (adminGun ? 19 : 17), life: 70, damage: adminGun ? 99999 : 25, explosive: adminGun, radius: adminGun ? 190 : 0 });
 }
 function spawnZombie(room) {
   const side = Math.random() < .5 ? -30 : WORLD_W + 30;
@@ -216,7 +220,7 @@ function tick(room) {
     b.x += b.vx; b.y += b.vy; b.life--;
     for (const z of room.zombies) {
       if (z.hp <= 0) continue;
-      if (Math.hypot(z.x - b.x, z.y - b.y) < 36) {
+      if (Math.hypot(z.x - b.x, z.y - b.y) < (b.explosive ? b.radius : 36)) {
         z.hp -= b.damage; b.life = 0;
         if (z.hp <= 0) {
           const owner = [...room.players.values()].find(p => p.id === b.owner);
@@ -293,7 +297,7 @@ function startDuelRound(duel) {
     p.x = i === 0 ? 170 : WORLD_W - 170;
     p.y = 390 + (i ? -35 : 35);
     p.facing = i === 0 ? 1 : -1;
-    p.hp = 100; p.ammo = 30; p.alive = true;
+    p.hp = p.character === "void_reaper" ? 99999 : 100; p.ammo = p.weapon === "doom_launcher" ? 999 : 30; p.alive = true;
     p.lastFire = 0; p.reloadAt = 0;
   });
   sendDuelState(duel);
@@ -302,7 +306,7 @@ function queueDuel(ws, msg) {
   const info = sockets.get(ws);
   if (!info) return fail(ws, "Log in to your online account first.");
   if (info.room || info.duel || info.duelQueue) return fail(ws, "Leave your current match first.");
-  const me = { ws, account: info.account, character:safeCharacter(msg.character), skin:safeSkin(msg.skin), id:nextPlayerId++, wins:0, hp:100, ammo:30, alive:true, x:170, y:390, facing:1, lastFire:0, reloadAt:0 };
+  const me = { ws, account: info.account, character:safeCharacter(msg.character, info.account), skin:safeSkin(msg.skin), weapon:safeWeapon(msg.weapon, info.account), admin:ADMIN_ACCOUNT_IDS.has(info.account), id:nextPlayerId++, wins:0, hp:ADMIN_ACCOUNT_IDS.has(info.account) && msg.character === "void_reaper" ? 99999 : 100, ammo:ADMIN_ACCOUNT_IDS.has(info.account) && msg.weapon === "doom_launcher" ? 999 : 30, alive:true, x:170, y:390, facing:1, lastFire:0, reloadAt:0 };
   const index = duelQueue.findIndex(p => p.account !== me.account && p.ws.readyState === WebSocket.OPEN);
   if (index < 0) {
     duelQueue.push(me); info.duelQueue = true;
@@ -350,7 +354,8 @@ function duelFire(ws, msg) {
   if (!duel || duel.roundEnded || !p || !p.alive || p.ammo <= 0 || !Number.isFinite(angle) || now-p.lastFire < 180) return;
   p.lastFire = now; p.ammo--;
   if (p.ammo === 0) p.reloadAt = now + 1700;
-  duel.bullets.push({ owner:p.id, x:p.x, y:p.y-35, vx:Math.cos(angle)*17, vy:Math.sin(angle)*17, life:70 });
+  const adminGun = p.admin && p.weapon === "doom_launcher";
+  duel.bullets.push({ owner:p.id, x:p.x, y:p.y-35, vx:Math.cos(angle)*(adminGun?19:17), vy:Math.sin(angle)*(adminGun?19:17), life:70, damage:adminGun?99999:25, explosive:adminGun, radius:adminGun?190:0 });
 }
 function stopDuel(duel) {
   if (!duel || duel.finished) return;
@@ -427,8 +432,8 @@ function tickDuel(duel) {
   for (const b of duel.bullets) {
     b.x += b.vx; b.y += b.vy; b.life--;
     const target = players.find(p=>p.id!==b.owner && p.alive);
-    if (target && Math.hypot(target.x-b.x,(target.y-35)-b.y)<30) {
-      target.hp = Math.max(0,target.hp-25); b.life=0;
+    if (target && Math.hypot(target.x-b.x,(target.y-35)-b.y)<(b.explosive?b.radius:30)) {
+      target.hp = Math.max(0,target.hp-(b.damage||25)); b.life=0;
       if (target.hp<=0) target.alive=false;
     }
   }
