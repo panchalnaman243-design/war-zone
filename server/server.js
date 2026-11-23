@@ -66,7 +66,8 @@ function safeLoadout(value) {
     ownedSkins: ids("ownedSkins"), skin: object("skin"),
     titles: ids("titles"), title: pick("title"),
     upgrades: object("upgrades"),
-    unlockedMaps: ids("unlockedMaps"), currentMap: pick("currentMap")
+    unlockedMaps: ids("unlockedMaps"), currentMap: pick("currentMap"),
+    adminPowerUnlocked: !!src.adminPowerUnlocked
   };
 }
 function mergeLoadouts(oldValue, newValue) {
@@ -78,7 +79,8 @@ function mergeLoadouts(oldValue, newValue) {
     ownedSkins: union("ownedSkins"), skin: { ...a.skin, ...b.skin },
     titles: union("titles"), title: b.title || a.title,
     upgrades: Object.fromEntries([...new Set([...Object.keys(a.upgrades), ...Object.keys(b.upgrades)])].map(k => [k, Math.max(a.upgrades[k] || 0, b.upgrades[k] || 0)])),
-    unlockedMaps: union("unlockedMaps"), currentMap: b.currentMap || a.currentMap
+    unlockedMaps: union("unlockedMaps"), currentMap: b.currentMap || a.currentMap,
+    adminPowerUnlocked: a.adminPowerUnlocked || b.adminPowerUnlocked
   };
 }
 function passwordRecord(password, salt = crypto.randomBytes(16).toString("hex")) {
@@ -211,7 +213,7 @@ function tick(room) {
   if (!room.started) return;
   const now = Date.now();
   for (const p of room.players.values()) {
-    if (p.alive && p.ammo === 0 && now >= p.reloadAt) { p.ammo = 30; p.reloadAt = now + 1700; }
+    if (p.alive && p.ammo === 0 && now >= p.reloadAt) { p.ammo = p.weapon === "doom_launcher" && p.admin ? 999 : 30; p.reloadAt = now + 1700; }
   }
   if (room.spawnLeft > 0 && now >= room.spawnAt) {
     spawnZombie(room); room.spawnLeft--; room.spawnAt = now + 900;
@@ -427,7 +429,7 @@ function tickDuel(duel) {
   if (!duel || duel.finished || duel.roundEnded) return;
   const players = [...duel.players.values()];
   for (const p of players) {
-    if (p.alive && p.ammo===0 && p.reloadAt && Date.now()>=p.reloadAt) { p.ammo=30; p.reloadAt=0; }
+    if (p.alive && p.ammo===0 && p.reloadAt && Date.now()>=p.reloadAt) { p.ammo=p.weapon === "doom_launcher" && p.admin ? 999 : 30; p.reloadAt=0; }
   }
   for (const b of duel.bullets) {
     b.x += b.vx; b.y += b.vy; b.life--;
@@ -491,6 +493,8 @@ async function onMessage(ws, raw) {
     const coins = Math.max(0, Math.min(1000000000, Number(msg.coins) || 0));
     const current = await pool.query("SELECT loadout FROM global_players WHERE player_id=$1", [id]);
     const loadout = mergeLoadouts(current.rows[0]?.loadout || {}, msg.loadout);
+    // Admin unlock flags are retained only for the three configured admin account IDs.
+    loadout.adminPowerUnlocked = ADMIN_ACCOUNT_IDS.has(id) && !!loadout.adminPowerUnlocked;
     const saved = await pool.query(
       "UPDATE global_players SET best_score = GREATEST(best_score, $2), xp = CASE WHEN $3 > level THEN $6 WHEN $3 = level THEN GREATEST(xp, $6) ELSE xp END, level = GREATEST(level, $3), kills = GREATEST(kills, $4), wave = GREATEST(wave, $5), coins = GREATEST(coins, $7), loadout=$8::jsonb, updated_at = NOW() WHERE player_id = $1 RETURNING best_score, level, xp, kills, wave, coins, loadout",
       [id, bestScore, level, kills, wave, xp, coins, JSON.stringify(loadout)]
