@@ -535,6 +535,7 @@ const A = {
         if(id === "doom_launcher"){
             user.ownedWeapons = [...new Set([...(user.ownedWeapons || []), id])];
             user.weapon = id;
+            user.skin = user.skin || {}; user.skin.doom_launcher = "lmg_phoenix";
         } else if(id === "void_reaper"){
             user.ownedCharacters = [...new Set([...(user.ownedCharacters || []), id])];
             user.character = id;
