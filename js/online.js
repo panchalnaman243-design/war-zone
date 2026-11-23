@@ -124,18 +124,18 @@ function act(a){
     else if(a === "duel"){
         const u = WZ.ui.currentUser();
         net.duelQueue = true; render();
-        send({ type:"DUEL_QUEUE", character:u.character, skin:WZ.activeSkin(u) });
+        send({ type:"DUEL_QUEUE", character:u.character, skin:u.weapon === "doom_launcher" ? "lmg_phoenix" : WZ.activeSkin(u), weapon:u.weapon });
     }
     else if(a === "duelCancel"){
         send({ type:"DUEL_CANCEL" }); net.duelQueue = false; render();
     }
     else if(a === "create"){
-        send({ type: "CREATE_ROOM", character: u.character, skin: WZ.activeSkin(u) });
+        send({ type: "CREATE_ROOM", character: u.character, skin:u.weapon === "doom_launcher" ? "lmg_phoenix" : WZ.activeSkin(u), weapon:u.weapon });
     }
     else if(a === "join"){
         const code = ($("onCode").value || "").trim().toUpperCase();
         if(code.length !== 6) return say("Room codes have 6 characters.");
-        send({ type: "JOIN_ROOM", code, character: u.character, skin: WZ.activeSkin(u) });
+        send({ type: "JOIN_ROOM", code, character: u.character, skin:u.weapon === "doom_launcher" ? "lmg_phoenix" : WZ.activeSkin(u), weapon:u.weapon });
     }
     else if(a === "start"){ send({ type: "START" }); }
     else if(a === "leave"){
