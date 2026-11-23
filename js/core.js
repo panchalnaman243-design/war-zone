@@ -57,6 +57,7 @@ WZ.normalizeUser = function(u){
     u.ownedCharacters = Array.isArray(u.ownedCharacters) ? u.ownedCharacters.filter(c => WZ.CHARACTERS[c]) : [];
     if(!u.ownedCharacters.includes("civilian")) u.ownedCharacters.push("civilian");
     u.upgrades = u.upgrades && typeof u.upgrades === "object" ? u.upgrades : {};
+    u.adminPowerUnlocked = !!u.adminPowerUnlocked;
     u.missionIndex = WZ.safeInt(u.missionIndex); u.missionProgress = WZ.safeInt(u.missionProgress);
     u.puzzlesSolved = WZ.safeInt(u.puzzlesSolved); u.bossKills = WZ.safeInt(u.bossKills);
     u.titles = Array.isArray(u.titles) ? u.titles.filter(t => WZ.TITLES.some(x => x.id === t)) : [];
