@@ -27,7 +27,8 @@ function syncGlobalUser(u){
     const data = {
         type: "GLOBAL_SYNC", id: u.id, credential: u.pw,
         bestScore: WZ.safeInt(u.bestScore), level: WZ.safeInt(u.level, 1),
-        kills: WZ.safeInt(u.kills), wave: WZ.safeInt(u.wave, 1)
+        kills: WZ.safeInt(u.kills), wave: WZ.safeInt(u.wave, 1),
+        xp: WZ.safeInt(u.xp), coins: WZ.safeInt(u.coins)
     };
     const key = [data.id, data.credential, data.bestScore, data.level, data.kills, data.wave].join("|");
     if(globalSyncKeys.get(data.id) === key && net.ws && net.ws.readyState === 1) return;
@@ -138,7 +139,33 @@ function act(a){
 
 /* ---------- server messages ---------- */
 handlers.HELLO = () => {};
-handlers.GLOBAL_SYNCED = () => refreshLeaderboard(true);
+handlers.GLOBAL_SYNCED = m => {
+    refreshLeaderboard(true);
+    const users = WZ.store.getUsers();
+    const saved = users[m.id];
+    if(!saved) return;
+    const oldLevel = WZ.safeInt(saved.level, 1);
+    const cloudLevel = WZ.safeInt(m.level, 1);
+    const next = {
+        bestScore: Math.max(WZ.safeInt(saved.bestScore), WZ.safeInt(m.best_score)),
+        level: Math.max(oldLevel, cloudLevel),
+        kills: Math.max(WZ.safeInt(saved.kills), WZ.safeInt(m.kills)),
+        wave: Math.max(WZ.safeInt(saved.wave, 1), WZ.safeInt(m.wave, 1)),
+        coins: Math.max(WZ.safeInt(saved.coins), WZ.safeInt(m.coins))
+    };
+    next.xp = cloudLevel > oldLevel ? WZ.safeInt(m.xp) :
+        cloudLevel === oldLevel ? Math.max(WZ.safeInt(saved.xp), WZ.safeInt(m.xp)) : WZ.safeInt(saved.xp);
+    const changed = Object.keys(next).some(k => WZ.safeInt(saved[k]) !== next[k]);
+    if(!changed) return;
+    Object.assign(saved, next);
+    WZ.store.saveUsers(users);
+    const current = WZ.ui.currentUser();
+    if(current && current.id === m.id) {
+        Object.assign(current, next);
+        WZ.ui.saveUser(current);
+        WZ.ui.showHome();
+    }
+};
 handlers.GLOBAL_SYNC_ERROR = m => WZ.toast(m.message || "Global leaderboard sync failed", "bad");
 handlers.GLOBAL_LEADERBOARD = m => {
     if(WZ.ui && WZ.ui.renderLeaderboard) WZ.ui.renderLeaderboard(m.players || []);
