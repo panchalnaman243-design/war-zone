@@ -102,7 +102,7 @@ WZ.ADMIN_WEAPONS = {
 };
 WZ.WEAPONS.doom_launcher = WZ.ADMIN_WEAPONS.doom_launcher;
 WZ.ADMIN_CHARACTERS = {
-    void_reaper: { id:"void_reaper", name:"VOID REAPER", price:0, speed:2.5, health:99999, damage:10, reload:.1, bio:"A black-armoured legend surrounded by a crimson energy aura." }
+    void_reaper: { id:"void_reaper", name:"SOUL REAPER", price:0, speed:2.5, health:99999, damage:10, reload:.1, bio:"A black-armoured legend surrounded by a crimson energy aura." }
 };
 
 /* ---------------------------------------------------------
