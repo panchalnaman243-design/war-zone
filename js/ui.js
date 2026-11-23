@@ -117,7 +117,16 @@ ui.renderLeaderboard = function(players){
 }
 
 ui.currentUser = () => user;
+ui.canUseAdminPower = () => isAdmin() && adminUnlocked;
+function guardAdminLoadout(){
+    if((user.weapon === "doom_launcher" || user.character === "void_reaper") && !ui.canUseAdminPower()){
+        if(user.weapon === "doom_launcher") user.weapon = "pistol";
+        if(user.character === "void_reaper") user.character = "civilian";
+        ui.saveUser(); updateHome(); WZ.toast("Admin Power Shop is locked. Unlock the admin panel first.", "bad");
+    }
+}
 ui.startOnlineGame = function(info){
+    guardAdminLoadout();
     show("game");
     try{ if(screen.orientation && screen.orientation.lock) screen.orientation.lock("landscape").catch(() => {}); }catch(e){}
     cancelAnimationFrame(heroRaf);
@@ -125,6 +134,7 @@ ui.startOnlineGame = function(info){
     WZ.game.startOnline(user, info);
 };
 ui.startGame = function(){
+    guardAdminLoadout();
     show("game");
     try{ if(screen.orientation && screen.orientation.lock) screen.orientation.lock("landscape").catch(() => {}); }catch(e){}
     cancelAnimationFrame(heroRaf);
