@@ -100,6 +100,7 @@ WZ.WEAPON_ORDER = ["pistol", "rifle", "smg", "shotgun", "sniper", "lmg"];
 WZ.ADMIN_WEAPONS = {
     doom_launcher: { id:"doom_launcher", name:"DOOM LAUNCHER", price:0, damage:9999, fireRate:180, mag:999, reserve:9999, speed:16, pellets:1, spread:0, pierce:99, reloadMs:1, recoil:22, shake:5, kb:18, explosive:true, blastRadius:190 }
 };
+WZ.WEAPONS.doom_launcher = WZ.ADMIN_WEAPONS.doom_launcher;
 WZ.ADMIN_CHARACTERS = {
     void_reaper: { id:"void_reaper", name:"VOID REAPER", price:0, speed:2.5, health:99999, damage:10, reload:.1, bio:"A black-armoured legend surrounded by a crimson energy aura." }
 };
