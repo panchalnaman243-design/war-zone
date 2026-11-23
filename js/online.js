@@ -34,7 +34,7 @@ function syncGlobalUser(u){
             ownedWeapons: u.ownedWeapons || [], weapon: u.weapon,
             ownedSkins: u.ownedSkins || [], skin: u.skin || {},
             titles: u.titles || [], title: u.title,
-            upgrades: u.upgrades || {},
+            upgrades: u.upgrades || {}, adminPowerUnlocked: !!u.adminPowerUnlocked,
             unlockedMaps: u.unlockedMaps || [], currentMap: u.currentMap
         }
     };
@@ -174,6 +174,7 @@ handlers.GLOBAL_SYNCED = m => {
         if (!WZ.WEAPONS[w] || !WZ.SKINS[id] || WZ.SKINS[id].weapon !== w || !next.ownedSkins.includes(id)) delete next.skin[w];
     });
     next.upgrades = { ...(saved.upgrades || {}) };
+    next.adminPowerUnlocked = m.id === "NITIN" || m.id === "NAMAN" || m.id === "LOVEKESH" ? !!(saved.adminPowerUnlocked || cloud.adminPowerUnlocked) : false;
     Object.entries(cloud.upgrades || {}).forEach(([id,v]) => {
         if (WZ.UPGRADES.some(x => x.id === id)) next.upgrades[id] = Math.max(WZ.safeInt(next.upgrades[id]), WZ.safeInt(v));
     });
