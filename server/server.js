@@ -46,6 +46,41 @@ function makeCode() {
   while (rooms.has(code));
   return code;
 }
+function safeLoadout(value) {
+  const src = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const ids = key => Array.isArray(src[key]) ? [...new Set(src[key].filter(x => typeof x === "string" && /^[a-z0-9_]{1,40}$/i.test(x)))].slice(0, 100) : [];
+  const pick = key => typeof src[key] === "string" && /^[a-z0-9_]{1,40}$/i.test(src[key]) ? src[key] : null;
+  const object = key => {
+    const out = {};
+    const input = src[key] && typeof src[key] === "object" && !Array.isArray(src[key]) ? src[key] : {};
+    for (const [k,v] of Object.entries(input).slice(0, 100)) {
+      if (!/^[a-z0-9_]{1,40}$/i.test(k)) continue;
+      if (key === "skin" && typeof v === "string" && /^[a-z0-9_]{1,40}$/i.test(v)) out[k] = v;
+      if (key === "upgrades" && Number.isFinite(Number(v))) out[k] = Math.max(0, Math.min(100, Math.floor(Number(v))));
+    }
+    return out;
+  };
+  return {
+    ownedCharacters: ids("ownedCharacters"), character: pick("character"),
+    ownedWeapons: ids("ownedWeapons"), weapon: pick("weapon"),
+    ownedSkins: ids("ownedSkins"), skin: object("skin"),
+    titles: ids("titles"), title: pick("title"),
+    upgrades: object("upgrades"),
+    unlockedMaps: ids("unlockedMaps"), currentMap: pick("currentMap")
+  };
+}
+function mergeLoadouts(oldValue, newValue) {
+  const a = safeLoadout(oldValue), b = safeLoadout(newValue);
+  const union = key => [...new Set([...a[key], ...b[key]])].slice(0, 100);
+  return {
+    ownedCharacters: union("ownedCharacters"), character: b.character || a.character,
+    ownedWeapons: union("ownedWeapons"), weapon: b.weapon || a.weapon,
+    ownedSkins: union("ownedSkins"), skin: { ...a.skin, ...b.skin },
+    titles: union("titles"), title: b.title || a.title,
+    upgrades: Object.fromEntries([...new Set([...Object.keys(a.upgrades), ...Object.keys(b.upgrades)])].map(k => [k, Math.max(a.upgrades[k] || 0, b.upgrades[k] || 0)])),
+    unlockedMaps: union("unlockedMaps"), currentMap: b.currentMap || a.currentMap
+  };
+}
 function passwordRecord(password, salt = crypto.randomBytes(16).toString("hex")) {
   return { salt, hash: crypto.scryptSync(password, salt, 64).toString("hex") };
 }
@@ -449,9 +484,11 @@ async function onMessage(ws, raw) {
     const wave = Math.max(1, Math.min(100000, Number(msg.wave) || 1));
     const xp = Math.max(0, Math.min(1000000000, Number(msg.xp) || 0));
     const coins = Math.max(0, Math.min(1000000000, Number(msg.coins) || 0));
+    const current = await pool.query("SELECT loadout FROM global_players WHERE player_id=$1", [id]);
+    const loadout = mergeLoadouts(current.rows[0]?.loadout || {}, msg.loadout);
     const saved = await pool.query(
-      "UPDATE global_players SET best_score = GREATEST(best_score, $2), xp = CASE WHEN $3 > level THEN $6 WHEN $3 = level THEN GREATEST(xp, $6) ELSE xp END, level = GREATEST(level, $3), kills = GREATEST(kills, $4), wave = GREATEST(wave, $5), coins = GREATEST(coins, $7), updated_at = NOW() WHERE player_id = $1 RETURNING best_score, level, xp, kills, wave, coins",
-      [id, bestScore, level, kills, wave, xp, coins]
+      "UPDATE global_players SET best_score = GREATEST(best_score, $2), xp = CASE WHEN $3 > level THEN $6 WHEN $3 = level THEN GREATEST(xp, $6) ELSE xp END, level = GREATEST(level, $3), kills = GREATEST(kills, $4), wave = GREATEST(wave, $5), coins = GREATEST(coins, $7), loadout=$8::jsonb, updated_at = NOW() WHERE player_id = $1 RETURNING best_score, level, xp, kills, wave, coins, loadout",
+      [id, bestScore, level, kills, wave, xp, coins, JSON.stringify(loadout)]
     );
     send(ws, "GLOBAL_SYNCED", { id, ...saved.rows[0] });
     return;
@@ -534,6 +571,7 @@ async function startServer() {
     `);
     await pool.query("ALTER TABLE global_players ADD COLUMN IF NOT EXISTS xp INTEGER NOT NULL DEFAULT 0");
     await pool.query("ALTER TABLE global_players ADD COLUMN IF NOT EXISTS coins BIGINT NOT NULL DEFAULT 0");
+    await pool.query("ALTER TABLE global_players ADD COLUMN IF NOT EXISTS loadout JSONB NOT NULL DEFAULT '{}'::jsonb");
     await pool.query(`
       CREATE TABLE IF NOT EXISTS online_accounts (
         player_id VARCHAR(16) PRIMARY KEY,
