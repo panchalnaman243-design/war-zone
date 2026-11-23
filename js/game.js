@@ -224,7 +224,7 @@ function start(user, online){
     WZ.fx.reset();
     G.player = { x: W * .72, y: H * .64, facing: -1 };
     G.lastTarget = { x: W * .2, y: H * .55 };
-    $("hudGun").src = `assets/guns/${G.skin}.webp`;
+    $("hudGun").src = user.weapon === "doom_launcher" ? "assets/Doom%20Launcher.webp" : `assets/guns/${G.skin}.webp`;
     $("hudGunName").textContent = wp.name;
     if(G.duel){ G.wave = 1; G.need = 4; G.killsWave = 0; banner("ONLINE 1v1 · ROUND 1"); }
     else beginWave(true);
