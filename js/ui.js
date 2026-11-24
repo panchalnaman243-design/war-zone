@@ -301,7 +301,7 @@ function openReward(){
 }
 
 function openRedeem(){
-    openModal("REDEEM CODE", `<div class="infoCard"><h3>🎟 PROMO CODE</h3><p>Enter a WAR ZONE reward code to claim coins or levels. Each code can be used once per player.</p></div>
+    openModal("REDEEM CODE", `<div class="infoCard"><h3>🎟 PROMO CODE</h3><p>Enter a WAR ZONE reward code to claim coins or levels. Each code can be used once per player.</p><p><b>WZ100</b> = 100 coins<br><b>LEVELUP3</b> = 3 levels</p></div>
         <div class="field"><label for="redeemInput">YOUR CODE</label><input id="redeemInput" maxlength="24" autocapitalize="characters" spellcheck="false" placeholder="ENTER CODE"></div>
         <button class="primary claim" data-act="redeemCode">REDEEM</button><div id="redeemMsg" class="authMsg"></div>`);
     $("redeemInput").focus();
