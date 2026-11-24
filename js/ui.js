@@ -70,6 +70,9 @@ function logout(){ user = null; WZ.store.setSession(null); cancelAnimationFrame(
    HOME
 --------------------------------------------------------- */
 ui.showHome = function(){
+    // Never let a stray home-screen refresh interrupt a live match.
+    // Intentional exits set WZ.game.running=false before calling showHome().
+    if(WZ.game && WZ.game.running) return;
     user = WZ.normalizeUser(user); ui.saveUser(user);
     show("home"); updateHome();
     // Sync every account saved on this device, not only the account currently logged in.
