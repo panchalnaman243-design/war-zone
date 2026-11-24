@@ -194,6 +194,21 @@ handlers.GLOBAL_SYNCED = m => {
     }
 };
 handlers.GLOBAL_SYNC_ERROR = m => WZ.toast(m.message || "Global leaderboard sync failed", "bad");
+handlers.CODE_REDEEMED = m => {
+    const u = WZ.ui.currentUser();
+    if(!u || u.id !== m.id) return;
+    u.coins = WZ.safeInt(m.coins, u.coins);
+    u.level = WZ.safeInt(m.level, u.level);
+    u.xp = WZ.safeInt(m.xp, u.xp);
+    WZ.ui.saveUser(u);
+    WZ.ui.showHome();
+    WZ.toast(m.rewardText || "Code redeemed!", "good");
+};
+handlers.CODE_ERROR = m => {
+    const el = $("redeemMsg");
+    if(el && WZ.ui.modalOpen()) el.textContent = m.message || "That code could not be redeemed.";
+    else WZ.toast(m.message || "That code could not be redeemed.", "bad");
+};
 handlers.GLOBAL_LEADERBOARD = m => {
     if(WZ.ui && WZ.ui.renderLeaderboard) WZ.ui.renderLeaderboard(m.players || []);
 };
@@ -259,6 +274,12 @@ WZ.online = {
     send,
     syncGlobalUser,
     refreshLeaderboard,
+    redeemCode(code){
+        const u = WZ.ui.currentUser();
+        if(!u || !u.pw) return false;
+        connect(() => send({ type:"REDEEM_CODE", id:u.id, credential:u.pw, code }));
+        return true;
+    },
     get inMatch(){ return net.inMatch; },
     get wallet(){ return net.wallet; },
     get inDuel(){ return net.duel; }
