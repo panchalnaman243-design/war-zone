@@ -300,6 +300,13 @@ function openReward(){
         ${can ? `<button class="claim primary" data-act="claimDaily">CLAIM 🪙 ${DAILY[idx]}</button>` : `<button class="claim disabledBtn">COME BACK TOMORROW</button>`}</div>`);
 }
 
+function openRedeem(){
+    openModal("REDEEM CODE", `<div class="infoCard"><h3>🎟 PROMO CODE</h3><p>Enter a WAR ZONE reward code to claim coins or levels. Each code can be used once per player.</p></div>
+        <div class="field"><label for="redeemInput">YOUR CODE</label><input id="redeemInput" maxlength="24" autocapitalize="characters" spellcheck="false" placeholder="ENTER CODE"></div>
+        <button class="primary claim" data-act="redeemCode">REDEEM</button><div id="redeemMsg" class="authMsg"></div>`);
+    $("redeemInput").focus();
+}
+
 function openGift(){
     const n = Object.keys(WZ.store.getUsers()).length - 1;
     openModal("GIFT COINS", `<div class="field"><label>PLAYER ID</label><input id="giftTarget" placeholder="ENTER PLAYER ID"></div>
@@ -542,6 +549,13 @@ const A = {
         const r = DAILY[streak % 7]; user.coins += r; d.last = todayStr(); d.streak = streak + 1;
         WZ.toast("+" + r + " coins", "good"); ui.saveUser(); updateHome(); openReward();
     },
+    redeemCode: () => {
+        const code = String($("redeemInput").value || "").trim().toUpperCase();
+        if(!/^[A-Z0-9_-]{3,24}$/.test(code)) return WZ.toast("Enter a valid code.", "bad");
+        if(!user || !user.pw) return WZ.toast("Please log in again before redeeming.", "bad");
+        if(!WZ.online || !WZ.online.redeemCode(code)) return WZ.toast("Could not connect. Try again.", "bad");
+        const msg = $("redeemMsg"); if(msg) msg.textContent = "Checking code...";
+    },
     sendGift: () => {
         const target = WZ.normalizeId($("giftTarget").value), amount = WZ.safeInt($("giftAmount").value);
         const users = WZ.store.getUsers();
@@ -603,6 +617,7 @@ ui.boot = async function(){
     $("mapsBtn").onclick = openMaps;
     $("titleView").onclick = openTitles;
     $("rewardBtn").onclick = openReward;
+    $("redeemBtn").onclick = openRedeem;
     $("giftBtn").onclick = openGift;
     $("multiBtn").onclick = openMulti;
     $("helpBtn").onclick = openHelp;
