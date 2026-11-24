@@ -42,7 +42,7 @@ WZ.assets = {
         const l = [];
         Object.keys(A.characters).forEach(c => ["body", "hands", "full"].forEach(p =>
             l.push([`${c}_${p}`, `assets/characters/${c}_${p}.webp`])));
-        l.push(["void_reaper_full", "Gemini_Generated_Image_5boln25boln25bol.png"]);
+        l.push(["void_reaper_full", "assets/Soul%20Reaper%20Original.png"]);
         l.push(["doom_launcher_full", "assets/Doom%20Launcher.webp"]);
         Object.keys(A.guns).forEach(g => l.push([g, `assets/guns/${g}.webp`]));
         return l;
