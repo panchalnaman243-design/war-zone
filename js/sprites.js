@@ -187,7 +187,7 @@ function drawPreview(canvas, char, skin, opt){
     ctx.clearRect(0, 0, w, h);
     const isSoulReaper = char === "void_reaper";
     const ch = h * (isSoulReaper ? 0.76 : (opt.fill || .94));
-    drawFighter(ctx, { char, skin, x: w * (isSoulReaper ? 0.5 : (opt.px || .36)), y: h * 0.97, h: ch, facing: 1, aim: opt.aim ?? -0.03, bob: opt.bob || 0 });
+    drawFighter(ctx, { char, skin, x: w * (isSoulReaper ? 0.5 : (opt.px || .36)), y: h * 0.97, h: ch, facing: isSoulReaper ? -1 : 1, aim: opt.aim ?? -0.03, bob: opt.bob || 0 });
 }
 
 WZ.fighter = { geometry, draw: drawFighter, preview: drawPreview };
