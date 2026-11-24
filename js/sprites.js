@@ -42,7 +42,7 @@ WZ.assets = {
         const l = [];
         Object.keys(A.characters).forEach(c => ["body", "hands", "full"].forEach(p =>
             l.push([`${c}_${p}`, `assets/characters/${c}_${p}.webp`])));
-        l.push(["void_reaper_full", "assets/Soul%20Reaper%20Original.png"]);
+        l.push(["void_reaper_full", "Gemini_Generated_Image_5boln25boln25bol.png"]);
         l.push(["doom_launcher_full", "assets/Doom%20Launcher.webp"]);
         Object.keys(A.guns).forEach(g => l.push([g, `assets/guns/${g}.webp`]));
         return l;
@@ -119,7 +119,7 @@ function drawFighter(ctx, o){
     if(o.char === "void_reaper" && IMG.void_reaper_full){
         // This artwork already includes the Doom Launcher in Soul Reaper's hands.
         // Draw it as one complete transparent sprite, anchored at the player's feet.
-        const im = IMG.void_reaper_full, h = o.h, w = h * (im.width / im.height);
+        const im = IMG.void_reaper_full, h = o.h * 1.16, w = h * (im.width / im.height);
         ctx.save();
         ctx.globalAlpha = o.hurt > 0 ? 0.8 : 1;
         ctx.fillStyle = "rgba(0,0,0,.38)";
@@ -129,16 +129,6 @@ function drawFighter(ctx, o){
         // Keep the artwork upright when facing right; flip only when facing left.
         ctx.scale(o.facing < 0 ? -1 : 1, 1);
         ctx.drawImage(im, -w / 2, -h, w, h);
-        // Place the Doom Launcher across both hands, over the katana grip.
-        const launcher = IMG.doom_launcher_full;
-        if(launcher){
-            const lw = h * 0.46, lh = lw * (launcher.height / launcher.width);
-            ctx.save();
-            ctx.translate(h * 0.10, -h * 0.57);
-            ctx.rotate(G.phi);
-            ctx.drawImage(launcher, -lw * 0.12, -lh * 0.50, lw, lh);
-            ctx.restore();
-        }
         ctx.restore();
         return G;
     }
