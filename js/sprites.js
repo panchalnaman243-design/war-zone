@@ -9,6 +9,19 @@ const WZ = window.WZ, A = WZ.ART;
    ASSET LOADER
 --------------------------------------------------------- */
 const IMG = {};
+function removeWhiteBackground(source){
+    const c = document.createElement("canvas");
+    c.width = source.width; c.height = source.height;
+    const g = c.getContext("2d", { willReadFrequently: true });
+    g.drawImage(source, 0, 0);
+    const pixels = g.getImageData(0, 0, c.width, c.height);
+    const d = pixels.data;
+    for(let i = 0; i < d.length; i += 4){
+        if(d[i] > 238 && d[i+1] > 238 && d[i+2] > 238) d[i+3] = 0;
+    }
+    g.putImageData(pixels, 0, 0);
+    return c;
+}
 WZ.assets = {
     img: k => IMG[k],
     list(){
@@ -16,6 +29,7 @@ WZ.assets = {
         Object.keys(A.characters).forEach(c => ["body", "hands", "full"].forEach(p =>
             l.push([`${c}_${p}`, `assets/characters/${c}_${p}.webp`])));
         l.push(["void_reaper_full", "assets/Soul%20Reaper.webp"]);
+        l.push(["doom_launcher_full", "assets/Doom%20Launcher.webp"]);
         Object.keys(A.guns).forEach(g => l.push([g, `assets/guns/${g}.webp`]));
         return l;
     },
@@ -23,7 +37,7 @@ WZ.assets = {
         const items = this.list(); let done = 0;
         return Promise.all(items.map(([key, src]) => new Promise(res => {
             const im = new Image();
-            im.onload = im.onerror = () => { IMG[key] = im.naturalWidth ? im : null; done++; onProgress && onProgress(done / items.length); res(); };
+            im.onload = im.onerror = () => { IMG[key] = im.naturalWidth ? ((key === "void_reaper_full" || key === "doom_launcher_full") ? removeWhiteBackground(im) : im) : null; done++; onProgress && onProgress(done / items.length); res(); };
             im.src = src;
         })));
     }
@@ -87,9 +101,25 @@ function drawFighter(ctx, o){
     const G = geometry(o);
     if(o.char === "void_reaper" && IMG.void_reaper_full){
         const im = IMG.void_reaper_full, h = o.h, w = h * (im.width / im.height);
-        ctx.save(); ctx.globalAlpha = o.hurt > 0 ? 0.8 : 1;
-        ctx.translate(o.x, o.y + (o.bob || 0)); ctx.scale(o.facing < 0 ? -1 : 1, 1);
-        ctx.drawImage(im, -w / 2, -h, w, h); ctx.restore();
+        const gun = IMG.doom_launcher_full || IMG[o.skin];
+        ctx.save();
+        ctx.globalAlpha = o.hurt > 0 ? 0.8 : 1;
+        ctx.fillStyle = "rgba(0,0,0,.38)";
+        ctx.beginPath(); ctx.ellipse(o.x, o.y - 1, h * .2, h * .045, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.translate(o.x, o.y + (o.bob || 0));
+        ctx.scale(o.facing < 0 ? -1 : 1, 1);
+        ctx.drawImage(im, -w / 2, -h, w, h);
+        // Place the Doom Launcher across the character's forward hand/chest area.
+        // Its angle follows the player's aim so the muzzle points where shots travel.
+        if(gun){
+            const gw = h * .66, gh = gw * (gun.height / gun.width);
+            ctx.save();
+            ctx.translate(h * .10, -h * .52);
+            ctx.rotate(G.phi);
+            ctx.drawImage(gun, -gw * .18, -gh * .50, gw, gh);
+            ctx.restore();
+        }
+        ctx.restore();
         return G;
     }
     const { k, cm, gm } = G;
