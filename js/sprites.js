@@ -119,24 +119,24 @@ function drawFighter(ctx, o){
     if(o.char === "void_reaper" && IMG.void_reaper_full){
         // This artwork already includes the Doom Launcher in Soul Reaper's hands.
         // Draw it as one complete transparent sprite, anchored at the player's feet.
-        const im = IMG.void_reaper_full, h = o.h * 1.15, w = h * (im.width / im.height);
+        const im = IMG.void_reaper_full, h = o.h, w = h * (im.width / im.height);
         ctx.save();
         ctx.globalAlpha = o.hurt > 0 ? 0.8 : 1;
         ctx.fillStyle = "rgba(0,0,0,.38)";
         ctx.beginPath(); ctx.ellipse(o.x, o.y - 1, h * .22, h * .045, 0, 0, Math.PI * 2); ctx.fill();
         ctx.translate(o.x, o.y + (o.bob || 0));
         // The supplied artwork points left by default; mirror only when facing right.
-        ctx.scale(o.facing > 0 ? -1 : 1, 1);
+        // Keep the artwork upright when facing right; flip only when facing left.
+        ctx.scale(o.facing < 0 ? -1 : 1, 1);
         ctx.drawImage(im, -w / 2, -h, w, h);
-        // Add the separate Doom Launcher over the hands/chest so the equipped
-        // admin weapon is visible even when the character artwork has a sword.
+        // Place the Doom Launcher across both hands, over the katana grip.
         const launcher = IMG.doom_launcher_full;
         if(launcher){
-            const lw = h * 0.66, lh = lw * (launcher.height / launcher.width);
+            const lw = h * 0.46, lh = lw * (launcher.height / launcher.width);
             ctx.save();
-            ctx.translate(h * 0.12, -h * 0.55);
+            ctx.translate(h * 0.10, -h * 0.57);
             ctx.rotate(G.phi);
-            ctx.drawImage(launcher, -lw * 0.28, -lh * 0.50, lw, lh);
+            ctx.drawImage(launcher, -lw * 0.12, -lh * 0.50, lw, lh);
             ctx.restore();
         }
         ctx.restore();
@@ -195,8 +195,9 @@ function drawPreview(canvas, char, skin, opt){
     const ctx = canvas.getContext("2d");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    const ch = h * (opt.fill || .94);
-    drawFighter(ctx, { char, skin, x: w * (opt.px || .36), y: h * .97, h: ch, facing: 1, aim: opt.aim || -0.03, bob: opt.bob || 0 });
+    const isSoulReaper = char === "void_reaper";
+    const ch = h * (isSoulReaper ? 0.76 : (opt.fill || .94));
+    drawFighter(ctx, { char, skin, x: w * (isSoulReaper ? 0.5 : (opt.px || .36)), y: h * 0.97, h: ch, facing: 1, aim: opt.aim ?? -0.03, bob: opt.bob || 0 });
 }
 
 WZ.fighter = { geometry, draw: drawFighter, preview: drawPreview };
