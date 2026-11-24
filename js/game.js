@@ -919,13 +919,13 @@ function shoot(geo, target){
         return;
     }
     const wp = G.wp, P = G.player;
-    G.ammo--; G.nextShot = now + G.fireDelay;
+    G.ammo--; G.nextShot = now + G.fireDelay; hud();
     // muzzle at rest (without recoil offset) so recoil never bends aim
     const g0 = WZ.fighter.geometry({ char: G.user.character, skin: G.skin, x: P.x, y: P.y, h: charH, facing: P.facing, target, recoil: 0, bob: G.bobPx });
     const m = g0.muzzle;
     let ang = Math.hypot(target.x - m.x, target.y - m.y) > 70 ? Math.atan2(target.y - m.y, target.x - m.x) : g0.barrel;
     const dmg = wp.damage * G.dmgMul;
-    if(G.online) WZ.online.send({ type: "FIRE", angle: ang, weapon: wp.id });
+    if(G.online) WZ.online.send({ type: "FIRE", angle: ang, x: toNetX(m.x), y: toNetY(m.y), weapon: wp.id });
     for(let i = 0; i < (G.online ? 0 : wp.pellets); i++){
         const sp = wp.pellets > 1 ? ((i / (wp.pellets - 1)) - .5) * wp.spread + (Math.random() - .5) * wp.spread * .3 : (Math.random() - .5) * wp.spread;
         const a = ang + sp, v = wp.speed * S * (wp.pellets > 1 ? rand(.85, 1.1) : 1);
@@ -1150,7 +1150,7 @@ function hud(force){
         bar.style.background = p > 55 ? "linear-gradient(90deg,#1fd67a,#4bf39a)" : p > 28 ? "linear-gradient(90deg,#e8a51a,#ffd45a)" : "linear-gradient(90deg,#d62a2a,#ff5a4d)";
     });
     set("ammo", G.ammo, v => $("ammoNow").textContent = v);
-    set("res", G.reserve, v => $("ammoRes").textContent = "/ " + v);
+    set("res", G.duel ? "AUTO" : G.reserve, v => $("ammoRes").textContent = G.duel ? "· AUTO" : "/ " + v);
     set("coins", G.duel ? G.onlineWallet : G.user.coins, v => $("hudCoins").textContent = WZ.fmt(v));
     set("power", `${Math.round(G.power)}|${G.stock.length}|${G.brewed.length}`, () => {
         $("powerFill").style.width = Math.round(G.power) + "%";
@@ -1360,7 +1360,7 @@ function onNet(s){
         return o;
     });
     G.bullets = (s.bullets || []).map(b => ({ x: netX(b.x), y: netY(b.y), a: b.a, tr: 46 }));
-    hud();
+    hud(true);
 }
 
 function onDuelRound(m){
