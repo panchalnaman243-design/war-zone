@@ -99,8 +99,6 @@ function updateHome(){
     $("waveView").textContent = u.wave;
     $("killsView").textContent = fmt(u.kills);
     $("heroName").textContent = WZ.CHARACTERS[u.character].name;
-    const adminArt = $("heroAdminArt");
-    if(adminArt) adminArt.classList.toggle("hidden", !(u.character === "void_reaper" && isAdmin()));
     $("heroGun").textContent = u.weapon === "doom_launcher" ? "DOOM LAUNCHER · ADMIN" : WZ.WEAPONS[u.weapon].name + " · " + WZ.SKINS[WZ.activeSkin(u)].name;
 
     const m = WZ.MISSIONS[u.missionIndex % WZ.MISSIONS.length];
@@ -198,6 +196,12 @@ const bar = (l, v) => `<div class="bar"><u>${l}</u><i><b style="width:${v}%"></b
 
 function openShop(tab){
     if(tab) shopTab = tab;
+    // Admin accounts can freely equip every standard character for testing.
+    if(isAdmin()){
+        const before = user.ownedCharacters.length;
+        user.ownedCharacters = [...new Set([...user.ownedCharacters, ...WZ.CHARACTER_ORDER])];
+        if(user.ownedCharacters.length !== before) ui.saveUser();
+    }
     const tabs = [["characters", "CHARACTERS"], ["weapons", "WEAPONS"], ["skins", "GUN SKINS"], ["upgrades", "UPGRADES"]];
     let html = `<div class="tabs">${tabs.map(t => `<button data-act="tab" data-arg="${t[0]}" class="${shopTab === t[0] ? "on" : ""}">${t[1]}</button>`).join("")}
         <span style="flex:1"></span><div class="chip gold"><i>🪙</i><b>${fmt(user.coins)}</b></div></div>`;
@@ -513,7 +517,12 @@ const A = {
     mapPlay: () => { ui.closeModal(); ui.startGame(); },
     titleEquip: id => { if(user.titles.includes(id)){ user.title = id; ui.saveUser(); updateHome(); openTitles(); } },
     charBuy: id => { const c = WZ.CHARACTERS[id]; if(spend(c.price)){ user.ownedCharacters.push(id); user.character = id; user.xp += 10; WZ.toast(c.name + " unlocked!", "good"); commit(); } },
-    charEquip: id => { user.character = id; commit(); },
+    charEquip: id => {
+        if(!WZ.CHARACTERS[id]) return;
+        if(isAdmin()) user.ownedCharacters = [...new Set([...(user.ownedCharacters || []), id])];
+        if(!user.ownedCharacters.includes(id)){ WZ.toast("Unlock this character first.", "bad"); return; }
+        user.character = id; ui.saveUser(); updateHome(); openShop();
+    },
     weaponBuy: id => { const w = WZ.WEAPONS[id]; if(spend(w.price)){ user.ownedWeapons.push(id); user.weapon = id; user.xp += 10; WZ.toast(w.name + " unlocked!", "good"); commit(); } },
     weaponEquip: id => { user.weapon = id; commit(); },
     skinBuy: id => { const s = WZ.SKINS[id]; if(spend(s.price)){ user.ownedSkins.push(id); user.skin[s.weapon] = id; user.xp += 5; WZ.toast(s.name + " skin unlocked!", "good"); commit(); } },
