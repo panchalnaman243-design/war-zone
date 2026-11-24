@@ -11,8 +11,19 @@ const accounts = new Map();
 const ADMIN_ACCOUNT_IDS = new Set(["NITIN", "NAMAN", "LOVEKESH"]);
 // Public promo codes. Add or change rewards here when releasing new codes.
 const REDEEM_CODES = {
-  WZ100: { coins: 100, levels: 0 },
-  LEVELUP3: { coins: 0, levels: 3 }
+  // 8 coin rewards (100–200 coins)
+  IRON100: { coins: 100, levels: 0 },
+  ZONE125: { coins: 125, levels: 0 },
+  BATTLE140: { coins: 140, levels: 0 },
+  STRIKE150: { coins: 150, levels: 0 },
+  SURVIVE160: { coins: 160, levels: 0 },
+  REAPER175: { coins: 175, levels: 0 },
+  WARZONE190: { coins: 190, levels: 0 },
+  VICTORY200: { coins: 200, levels: 0 },
+  // 3 level rewards (3–6 levels)
+  RANKUP3: { coins: 0, levels: 3 },
+  ELITE4: { coins: 0, levels: 4 },
+  LEGEND6: { coins: 0, levels: 6 }
 };
 function validAdminLogin(id, password) {
   if (!ADMIN_ACCOUNT_IDS.has(id)) return true;
