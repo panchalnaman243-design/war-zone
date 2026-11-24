@@ -9,6 +9,11 @@ const PORT = Number(process.env.PORT || 3000);
 const WORLD_W = 1000, WORLD_H = 600, MAX_PLAYERS = 8;
 const accounts = new Map();
 const ADMIN_ACCOUNT_IDS = new Set(["NITIN", "NAMAN", "LOVEKESH"]);
+// Public promo codes. Add or change rewards here when releasing new codes.
+const REDEEM_CODES = {
+  WZ100: { coins: 100, levels: 0 },
+  LEVELUP3: { coins: 0, levels: 3 }
+};
 function validAdminLogin(id, password) {
   if (!ADMIN_ACCOUNT_IDS.has(id)) return true;
   const required = process.env["ADMIN_" + id + "_PASSWORD"];
@@ -458,6 +463,42 @@ async function onMessage(ws, raw) {
   let msg;
   try { msg = JSON.parse(raw.toString()); } catch { return fail(ws, "Invalid message."); }
   if (!msg || typeof msg.type !== "string") return fail(ws, "Invalid message.");
+  // Redeem a one-time promo code after verifying the player's account credential.
+  if (msg.type === "REDEEM_CODE") {
+    if (!pool) return send(ws, "CODE_ERROR", { message: "Rewards are temporarily unavailable. Try again later." });
+    const id = cleanId(msg.id), credential = String(msg.credential || "");
+    const code = String(msg.code || "").trim().toUpperCase();
+    const reward = REDEEM_CODES[code];
+    if (id.length < 3 || !/^[a-f0-9]{8,128}$/i.test(credential))
+      return send(ws, "CODE_ERROR", { message: "Please log in again, then try the code." });
+    if (!reward) return send(ws, "CODE_ERROR", { message: "Invalid code. Check the spelling." });
+    await pool.query("CREATE TABLE IF NOT EXISTS promo_code_claims (player_id VARCHAR(16) NOT NULL REFERENCES global_players(player_id) ON DELETE CASCADE, code VARCHAR(24) NOT NULL, claimed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY (player_id, code))");
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const account = await client.query("SELECT credential_salt, credential_hash FROM global_players WHERE player_id=$1 FOR UPDATE", [id]);
+      if (!account.rowCount || !passwordMatches(credential, { salt:account.rows[0].credential_salt, hash:account.rows[0].credential_hash })) {
+        await client.query("ROLLBACK");
+        return send(ws, "CODE_ERROR", { message: "Account verification failed. Please log in again." });
+      }
+      const claimed = await client.query("INSERT INTO promo_code_claims (player_id, code) VALUES ($1,$2) ON CONFLICT (player_id, code) DO NOTHING RETURNING code", [id, code]);
+      if (!claimed.rowCount) {
+        await client.query("ROLLBACK");
+        return send(ws, "CODE_ERROR", { message: "You have already used this code." });
+      }
+      const updated = await client.query(
+        "UPDATE global_players SET coins=coins+$2, level=LEAST(100000, level+$3), updated_at=NOW() WHERE player_id=$1 RETURNING coins, level, xp",
+        [id, reward.coins, reward.levels]
+      );
+      await client.query("COMMIT");
+      const row = updated.rows[0];
+      const rewardText = reward.coins ? "+" + reward.coins + " coins claimed!" : "+" + reward.levels + " levels claimed!";
+      return send(ws, "CODE_REDEEMED", { id, coins:Number(row.coins)||0, level:Number(row.level)||1, xp:Number(row.xp)||0, rewardText });
+    } catch (err) {
+      await client.query("ROLLBACK").catch(()=>{});
+      throw err;
+    } finally { client.release(); }
+  }
   // Public global leaderboard: read player records from PostgreSQL.
   if (msg.type === "GLOBAL_LEADERBOARD") {
     if (!pool) return send(ws, "GLOBAL_SYNC_ERROR", { message: "Leaderboard database is not connected yet." });
