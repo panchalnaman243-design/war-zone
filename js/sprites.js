@@ -112,7 +112,10 @@ function geometry(o){
 }
 
 function drawFighter(ctx, o){
-    const G = geometry(o);
+    // Admin weapons may not have a regular body/hand anchor in art-meta.
+    // Use a safe standard anchor for aiming math so the custom full-body sprite still renders.
+    const safeSkin = A.guns[o.skin] ? o.skin : (A.guns.pistol_std ? "pistol_std" : Object.keys(A.guns)[0]);
+    const G = geometry({ ...o, skin: safeSkin });
     if(o.char === "void_reaper" && IMG.void_reaper_full){
         // This artwork already includes the Doom Launcher in Soul Reaper's hands.
         // Draw it as one complete transparent sprite, anchored at the player's feet.
@@ -125,6 +128,17 @@ function drawFighter(ctx, o){
         // The supplied artwork points left by default; mirror only when facing right.
         ctx.scale(o.facing > 0 ? -1 : 1, 1);
         ctx.drawImage(im, -w / 2, -h, w, h);
+        // Add the separate Doom Launcher over the hands/chest so the equipped
+        // admin weapon is visible even when the character artwork has a sword.
+        const launcher = IMG.doom_launcher_full;
+        if(launcher){
+            const lw = h * 0.66, lh = lw * (launcher.height / launcher.width);
+            ctx.save();
+            ctx.translate(h * 0.12, -h * 0.55);
+            ctx.rotate(G.phi);
+            ctx.drawImage(launcher, -lw * 0.28, -lh * 0.50, lw, lh);
+            ctx.restore();
+        }
         ctx.restore();
         return G;
     }
