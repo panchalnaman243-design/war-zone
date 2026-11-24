@@ -357,7 +357,12 @@ function duelFire(ws, msg) {
   p.lastFire = now; p.ammo--;
   if (p.ammo === 0) p.reloadAt = now + 1700;
   const adminGun = p.admin && p.weapon === "doom_launcher";
-  duel.bullets.push({ owner:p.id, x:p.x, y:p.y-35, vx:Math.cos(angle)*(adminGun?19:17), vy:Math.sin(angle)*(adminGun?19:17), life:70, damage:adminGun?99999:25, explosive:adminGun, radius:adminGun?190:0 });
+  // Use the real weapon muzzle sent by the client, while validating its distance from the player.
+  const fx = Number(msg.x), fy = Number(msg.y);
+  const nearMuzzle = Number.isFinite(fx) && Number.isFinite(fy) && Math.hypot(fx-p.x, fy-p.y) <= 110;
+  const bx = nearMuzzle ? fx : p.x;
+  const by = nearMuzzle ? fy : p.y - 35;
+  duel.bullets.push({ owner:p.id, x:bx, y:by, vx:Math.cos(angle)*(adminGun?19:17), vy:Math.sin(angle)*(adminGun?19:17), life:70, damage:adminGun?99999:25, explosive:adminGun, radius:adminGun?190:0 });
 }
 function stopDuel(duel) {
   if (!duel || duel.finished) return;
