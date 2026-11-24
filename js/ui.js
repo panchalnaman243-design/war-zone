@@ -458,7 +458,7 @@ function openAdminPowerShop(){
             </div>
             <div class="shopItem legendary">
                 <span class="badge legendary">ADMIN ONLY</span>
-                <div class="itemVisual" style="height:190px"><img src="assets/Soul%20Reaper.webp" alt="Soul Reaper"></div>
+                <div class="itemVisual" style="height:190px"><img src="Gemini_Generated_Image_5boln25boln25bol.png" alt="Soul Reaper"></div>
                 <div class="itemName">SOUL REAPER</div><div class="itemDesc">Black-armour elite · crimson aura · maximum health, speed and damage.</div>
                 <div class="bars">${bar("SPEED",100)}${bar("HEALTH",100)}${bar("DAMAGE",100)}${bar("RELOAD",100)}</div>
                 <button class="shopAction equip" data-act="powerEquip" data-arg="void_reaper">${user.character === "void_reaper" ? "✔ EQUIPPED" : "EQUIP CHARACTER"}</button>
