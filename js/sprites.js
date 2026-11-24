@@ -17,8 +17,8 @@ function removeWhiteBackground(source){
     const pixels = g.getImageData(0, 0, c.width, c.height);
     const d = pixels.data, w = c.width, h = c.height;
     const seen = new Uint8Array(w * h), queue = new Int32Array(w * h);
-    const nearWhite = i => d[i] > 218 && d[i+1] > 218 && d[i+2] > 218 &&
-        Math.max(d[i], d[i+1], d[i+2]) - Math.min(d[i], d[i+1], d[i+2]) < 32;
+    const nearWhite = i => Math.min(d[i], d[i+1], d[i+2]) > 145 &&
+        Math.max(d[i], d[i+1], d[i+2]) - Math.min(d[i], d[i+1], d[i+2]) < 48;
     let head = 0, tail = 0;
     const add = p => {
         if(p < 0 || p >= w*h || seen[p]) return;
@@ -42,7 +42,7 @@ WZ.assets = {
         const l = [];
         Object.keys(A.characters).forEach(c => ["body", "hands", "full"].forEach(p =>
             l.push([`${c}_${p}`, `assets/characters/${c}_${p}.webp`])));
-        l.push(["void_reaper_full", "assets/Soul%20Reaper.webp"]);
+        l.push(["void_reaper_full", "Gemini_Generated_Image_5boln25boln25bol.png"]);
         l.push(["doom_launcher_full", "assets/Doom%20Launcher.webp"]);
         Object.keys(A.guns).forEach(g => l.push([g, `assets/guns/${g}.webp`]));
         return l;
