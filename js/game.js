@@ -281,19 +281,24 @@ function saveProgress(dead){
 
 function gameOver(){
     if(ended) return;
-    ended = true; running = false;
-    WZ.sfx.over(); WZ.haptic(120);
-    saveProgress(true);
+    ended = true; running = false; paused = false;
+    cancelAnimationFrame(raf);
+    mouse.down = false;
+    for(const k in keys) keys[k] = false;
+    stick.move.id = stick.aim.id = null; stick.aim.active = false;
+    hideStick("stickL"); hideStick("stickR");
+    stopAllTimers();
+    $("pauseOverlay").classList.add("hidden");
+    $("puzzleOverlay").classList.add("hidden");
     $("overScore").textContent = WZ.fmt(G.score);
     $("overBest").textContent = WZ.fmt(G.user.bestScore);
     $("overWave").textContent = G.wave;
     $("overKills").textContent = G.kills;
     $("overCoins").textContent = G.coinsEarned;
-    setTimeout(() => $("overOverlay").classList.remove("hidden"), 700);
-    // keep rendering the death scene for a moment
-    const t0 = performance.now();
-    const tail = () => { if(performance.now() - t0 < 900){ render(); requestAnimationFrame(tail); } };
-    tail();
+    // Keep the player on the game screen and show the results immediately.
+    $("overOverlay").classList.remove("hidden");
+    WZ.sfx.over(); WZ.haptic(120);
+    saveProgress(true);
 }
 
 function announceTitles(list){
@@ -747,6 +752,9 @@ function loop(t){
     if(dt > 50) dt = 50;
     G.time += dt;
     update(dt, dt / 16.667);
+    // Damage can end the run inside update(); never render or schedule another
+    // gameplay frame after game-over has stopped the run.
+    if(!running || paused || ended) return;
     render();
     raf = requestAnimationFrame(loop);
 }
