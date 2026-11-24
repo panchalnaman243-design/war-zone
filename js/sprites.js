@@ -15,9 +15,23 @@ function removeWhiteBackground(source){
     const g = c.getContext("2d", { willReadFrequently: true });
     g.drawImage(source, 0, 0);
     const pixels = g.getImageData(0, 0, c.width, c.height);
-    const d = pixels.data;
-    for(let i = 0; i < d.length; i += 4){
-        if(d[i] > 238 && d[i+1] > 238 && d[i+2] > 238) d[i+3] = 0;
+    const d = pixels.data, w = c.width, h = c.height;
+    const seen = new Uint8Array(w * h), queue = new Int32Array(w * h);
+    const nearWhite = i => d[i] > 218 && d[i+1] > 218 && d[i+2] > 218 &&
+        Math.max(d[i], d[i+1], d[i+2]) - Math.min(d[i], d[i+1], d[i+2]) < 32;
+    let head = 0, tail = 0;
+    const add = p => {
+        if(p < 0 || p >= w*h || seen[p]) return;
+        const i = p * 4;
+        if(nearWhite(i)){ seen[p] = 1; queue[tail++] = p; }
+    };
+    for(let x=0;x<w;x++){ add(x); add((h-1)*w+x); }
+    for(let y=1;y<h-1;y++){ add(y*w); add(y*w+w-1); }
+    while(head < tail){
+        const p = queue[head++], x = p % w, y = (p / w) | 0;
+        d[p*4+3] = 0;
+        if(x) add(p-1); if(x+1<w) add(p+1);
+        if(y) add(p-w); if(y+1<h) add(p+w);
     }
     g.putImageData(pixels, 0, 0);
     return c;
@@ -100,25 +114,17 @@ function geometry(o){
 function drawFighter(ctx, o){
     const G = geometry(o);
     if(o.char === "void_reaper" && IMG.void_reaper_full){
-        const im = IMG.void_reaper_full, h = o.h, w = h * (im.width / im.height);
-        const gun = IMG.doom_launcher_full || IMG[o.skin];
+        // This artwork already includes the Doom Launcher in Soul Reaper's hands.
+        // Draw it as one complete transparent sprite, anchored at the player's feet.
+        const im = IMG.void_reaper_full, h = o.h * 1.15, w = h * (im.width / im.height);
         ctx.save();
         ctx.globalAlpha = o.hurt > 0 ? 0.8 : 1;
         ctx.fillStyle = "rgba(0,0,0,.38)";
-        ctx.beginPath(); ctx.ellipse(o.x, o.y - 1, h * .2, h * .045, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(o.x, o.y - 1, h * .22, h * .045, 0, 0, Math.PI * 2); ctx.fill();
         ctx.translate(o.x, o.y + (o.bob || 0));
-        ctx.scale(o.facing < 0 ? -1 : 1, 1);
+        // The supplied artwork points left by default; mirror only when facing right.
+        ctx.scale(o.facing > 0 ? -1 : 1, 1);
         ctx.drawImage(im, -w / 2, -h, w, h);
-        // Place the Doom Launcher across the character's forward hand/chest area.
-        // Its angle follows the player's aim so the muzzle points where shots travel.
-        if(gun){
-            const gw = h * .66, gh = gw * (gun.height / gun.width);
-            ctx.save();
-            ctx.translate(h * .10, -h * .52);
-            ctx.rotate(G.phi);
-            ctx.drawImage(gun, -gw * .18, -gh * .50, gw, gh);
-            ctx.restore();
-        }
         ctx.restore();
         return G;
     }
