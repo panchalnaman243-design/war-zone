@@ -125,9 +125,9 @@ function drawFighter(ctx, o){
         ctx.fillStyle = "rgba(0,0,0,.38)";
         ctx.beginPath(); ctx.ellipse(o.x, o.y - 1, h * .22, h * .045, 0, 0, Math.PI * 2); ctx.fill();
         ctx.translate(o.x, o.y + (o.bob || 0));
-        // The supplied artwork points left by default; mirror only when facing right.
-        // Keep the artwork upright when facing right; flip only when facing left.
-        ctx.scale(o.facing < 0 ? -1 : 1, 1);
+        // The supplied Soul Reaper artwork (including the launcher) points left.
+        // Keep it unflipped when facing left; mirror only when facing right.
+        ctx.scale(o.facing > 0 ? -1 : 1, 1);
         ctx.drawImage(im, -w / 2, -h, w, h);
         ctx.restore();
         return G;
