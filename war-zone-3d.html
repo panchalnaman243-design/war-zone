@@ -347,7 +347,7 @@
     }
     const loader=new THREE.GLTFLoader(),failures=[];
     const modelTasks=Object.keys(zombieTypes).map(type=>{
-      const path='assets/zombies/'+zombieTypes[type].file;
+      const path='assets/'+zombieTypes[type].file;
       return new Promise(resolve=>{
         loader.load(path,gltf=>{
           try{
