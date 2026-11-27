@@ -179,7 +179,7 @@
   document.addEventListener('contextmenu',e=>e.preventDefault());
   let firing=false;document.addEventListener('mousedown',e=>{if(e.button===0&&locked)firing=true;if(e.button===2&&locked)aiming=true;});document.addEventListener('mouseup',e=>{if(e.button===0)firing=false;if(e.button===2)aiming=false;});
   function shoot(now){
-    if(!locked||reloading||ammo<=0||now-lastShot<115)return;if(ammo<=0){toast('PRESS R TO RELOAD');return;}lastShot=now;ammo--;document.getElementById('ammo').textContent=ammo+' / '+reserveAmmo;
+    if(!locked||reloading||now-lastShot<115)return;if(ammo<=0){toast('PRESS R TO RELOAD');return;}lastShot=now;ammo--;document.getElementById('ammo').textContent=ammo+' / '+reserveAmmo;
     muzzle.visible=true;setTimeout(()=>muzzle.visible=false,55);recoil=.09;arms[0].rotation.x+=.035;arms[1].rotation.x+=.045;
     const origin=new THREE.Vector3();muzzle.getWorldPosition(origin);
     const dir=new THREE.Vector3(-Math.sin(yaw),Math.sin(pitch),-Math.cos(yaw)).normalize();
@@ -199,10 +199,10 @@
     player.position.x=THREE.MathUtils.clamp(player.position.x,-58,58);player.position.z=THREE.MathUtils.clamp(player.position.z,-112,112);
     const wasAirborne=!onGround;velocityY-=20*dt;player.position.y+=velocityY*dt;if(player.position.y<=0){if(wasAirborne&&velocityY< -2)landingBounce=.12;player.position.y=0;velocityY=0;onGround=true;}else{landingBounce*=.9;}
     // Third-person shoulder camera: follows behind and slightly above the soldier.
-    const focus=new THREE.Vector3(player.position.x,1.7+player.position.y,player.position.z);
+    const focus=new THREE.Vector3(player.position.x,1.7+player.position.y+landingBounce*.4,player.position.z);
     const offset=new THREE.Vector3(aiming?2.35:4.2,aiming?2.25:3.0,aiming?4.25:6.6).applyAxisAngle(new THREE.Vector3(0,1,0),yaw);
     camera.position.lerp(focus.clone().add(offset),1-Math.pow(.001,dt));camera.lookAt(focus.clone().add(new THREE.Vector3(-Math.sin(yaw)*12,Math.sin(pitch)*10,-Math.cos(yaw)*12)));
-    player.position.y+=landingBounce;gun.position.z=-.48-recoil;gun.rotation.x=-recoil*.55;recoil*=.78;
+    gun.position.z=-.48-recoil;gun.rotation.x=-recoil*.55;recoil*=.78;
     renderer.render(scene,camera);
   }
   addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));});
