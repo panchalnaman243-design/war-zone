@@ -79,6 +79,76 @@
   for(let i=0;i<12;i++){const x=(i%2?1:-1)*(15+(i%3)*3);box(x,.9,35+Math.floor(i/2)*8,2.5,1.8,2.5,0x6b604b);}
   // Street lamps
   for(const x of [-12,12])for(let z=-85;z<95;z+=30){const pole= new THREE.Mesh(new THREE.CylinderGeometry(.12,.16,7,8),mat(0x303a3e,.5,.65));pole.position.set(x,3.5,z);pole.castShadow=true;scene.add(pole);box(x,7,z,.9,.16,.35,0xb8c6c2);}
+  // Destroyed-city battlefield dressing: rubble, blast damage, smoke, sandbags and wrecked vehicles.
+  const rubbleMats=[mat(0x555b59),mat(0x6a6257),mat(0x41494b),mat(0x81796b)];
+  // Broken masonry scattered along sidewalks and around combat cover.
+  for(let i=0;i<95;i++){
+    const side=i%2?1:-1, x=side*(13+Math.random()*34), z=-105+Math.random()*210;
+    const size=.25+Math.random()*1.05;
+    const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(size,0),rubbleMats[i%rubbleMats.length]);
+    rock.position.set(x,size*.45,z);rock.rotation.set(Math.random()*2,Math.random()*3,Math.random()*2);
+    rock.scale.y=.45+Math.random()*.55;rock.castShadow=true;rock.receiveShadow=true;scene.add(rock);
+  }
+  // Blast-scarred concrete barriers and sandbag firing positions.
+  function sandbag(x,y,z,rot=0){
+    const bag=new THREE.Mesh(new THREE.CapsuleGeometry(.32,.72,4,8),mat(0x777052));
+    bag.rotation.z=Math.PI/2;bag.rotation.y=rot;bag.position.set(x,y,z);bag.castShadow=true;bag.receiveShadow=true;scene.add(bag);
+  }
+  for(const side of [-1,1]){
+    for(let row=0;row<2;row++)for(let n=0;n<5;n++)sandbag(side*(8.8+row*.58),.32+n%2*.03, -8+n*.72,side*.08);
+    box(side*8.1,.65,18,1.2,1.3,4,0x555d5b);
+    box(side*8.1,1.32,18,.55,.12,4.1,0x333b3c);
+  }
+  // Wrecked military transport: angular armored body, cabin, windows and six wheels.
+  function wreckedVehicle(x,z,rot=0){
+    const v=new THREE.Group();v.position.set(x,0,z);v.rotation.y=rot;scene.add(v);
+    const body=new THREE.Mesh(new THREE.BoxGeometry(3.1,1.05,5.4),mat(0x41483e));body.position.y=1.05;body.castShadow=true;body.receiveShadow=true;v.add(body);
+    const cabin=new THREE.Mesh(new THREE.BoxGeometry(2.65,1.15,2.5),mat(0x353e3b));cabin.position.set(0,2.05,-.25);cabin.castShadow=true;v.add(cabin);
+    for(const sx of [-1,1])for(const zz of [-1.8,0,1.8]){
+      const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.58,.58,.34,12),mat(0x111719));
+      wheel.rotation.z=Math.PI/2;wheel.position.set(sx*1.62,.62,zz);wheel.castShadow=true;v.add(wheel);
+    }
+    const glassMat=new THREE.MeshStandardMaterial({color:0x172a30,metalness:.45,roughness:.28});
+    const windshield=new THREE.Mesh(new THREE.PlaneGeometry(2.1,.72),glassMat);
+    windshield.position.set(0,2.12,-1.51);v.add(windshield);
+    const dent=new THREE.Mesh(new THREE.BoxGeometry(1.2,.18,1.5),mat(0x252d2b));dent.position.set(.55,2.62,.4);dent.rotation.z=-.22;v.add(dent);
+    box(x,0,z,.01,.01,.01,0x41483e);
+  }
+  wreckedVehicle(-15,-55,-.18);wreckedVehicle(16,76,Math.PI+.2);
+  // Burnt-out civilian car near the far intersection.
+  const car=new THREE.Group();car.position.set(5,0,-91);car.rotation.y=-.3;scene.add(car);
+  const carBody=new THREE.Mesh(new THREE.BoxGeometry(2.2,.72,4.1),mat(0x343b3c));carBody.position.y=.75;car.add(carBody);
+  const carTop=new THREE.Mesh(new THREE.BoxGeometry(1.8,.72,2.1),mat(0x252d30));carTop.position.set(0,1.35,.15);car.add(carTop);
+  for(const sx of [-1,1])for(const zz of [-1.25,1.25]){
+    const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.38,.38,.22,10),mat(0x101416));wheel.rotation.z=Math.PI/2;wheel.position.set(sx*1.12,.4,zz);car.add(wheel);
+  }
+  // Smoke plumes with layered translucent billows; animated subtly in the render loop.
+  const smokePuffs=[];
+  function smokeColumn(x,z,height=13){
+    const plume=new THREE.Group();plume.position.set(x,0,z);scene.add(plume);
+    for(let i=0;i<9;i++){
+      const s=1.1+i*.22;
+      const puff=new THREE.Mesh(new THREE.SphereGeometry(s,10,8),new THREE.MeshStandardMaterial({color:i%2?0x4c5557:0x687072,transparent:true,opacity:.23,roughness:1,depthWrite:false}));
+      puff.position.set(Math.sin(i*1.7)*.7,height*.35+i*1.15,Math.cos(i*1.3)*.6);puff.scale.set(1,.8,1);plume.add(puff);
+    }
+    smokePuffs.push(plume);
+  }
+  smokeColumn(-31,-42,8);smokeColumn(34,19,6);smokeColumn(-18,88,5);
+  // Road cracks and impact scars.
+  const crackMat=new THREE.LineBasicMaterial({color:0x101719,transparent:true,opacity:.8});
+  for(let i=0;i<18;i++){
+    const x=-8+Math.random()*16,z=-100+Math.random()*200;
+    const pts=[new THREE.Vector3(x,.052,z),new THREE.Vector3(x+.35,.052,z+.55),new THREE.Vector3(x-.18,.052,z+1.1)];
+    scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),crackMat));
+  }
+  // Charred street-side debris piles.
+  for(const [x,z] of [[-11,-34],[12,-4],[-13,43],[11,93],[-9,-78]]){
+    for(let j=0;j<7;j++){
+      const chunk=new THREE.Mesh(new THREE.BoxGeometry(.35+Math.random()*.7,.18+Math.random()*.4,.3+Math.random()*.6),rubbleMats[j%4]);
+      chunk.position.set(x+(Math.random()-.5)*2,.18+Math.random()*.18,z+(Math.random()-.5)*2);
+      chunk.rotation.y=Math.random()*Math.PI;chunk.castShadow=true;scene.add(chunk);
+    }
+  }
   // Step 1: detailed modern military soldier built from layered procedural meshes.
   // Kept self-contained so this upgrade does not touch accounts, saves, or multiplayer.
   const player=new THREE.Group();scene.add(player);
@@ -192,6 +262,7 @@
   function animate(){
     requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.04),now=performance.now();
     if(firing)shoot(now);
+    smokePuffs.forEach((p,i)=>{p.position.y=.25+Math.sin(now*.00035+i)*.22;p.rotation.y=Math.sin(now*.00012+i)*.08;});
     const forward=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw)),right=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
     let move=new THREE.Vector3();if(keys.KeyW||keys.ArrowUp)move.add(forward);if(keys.KeyS||keys.ArrowDown)move.sub(forward);if(keys.KeyD||keys.ArrowRight)move.add(right);if(keys.KeyA||keys.ArrowLeft)move.sub(right);
     const moving=move.lengthSq()>0;const sprinting=!!keys.ShiftLeft&&moving;player.rotation.y=yaw;if(moving){move.normalize();const speed=sprinting?12:8;player.position.addScaledVector(move,speed*dt);walkTime+=dt*(sprinting?15:10);legs[0].rotation.x=Math.sin(walkTime)*(sprinting?.72:.48);legs[1].rotation.x=-Math.sin(walkTime)*(sprinting?.72:.48);arms[0].rotation.x=1.02-Math.sin(walkTime)*.035;arms[1].rotation.x=1.02+Math.sin(walkTime)*.035;}else{legs[0].rotation.x*=.82;legs[1].rotation.x*=.82;arms[0].rotation.x+=(1.02-arms[0].rotation.x)*.18;arms[1].rotation.x+=(1.02-arms[1].rotation.x)*.18;}
