@@ -194,7 +194,7 @@
     if(firing)shoot(now);
     const forward=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw)),right=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
     let move=new THREE.Vector3();if(keys.KeyW||keys.ArrowUp)move.add(forward);if(keys.KeyS||keys.ArrowDown)move.sub(forward);if(keys.KeyD||keys.ArrowRight)move.add(right);if(keys.KeyA||keys.ArrowLeft)move.sub(right);
-    const moving=move.lengthSq()>0;if(moving){move.normalize();const speed=keys.ShiftLeft?12:8;player.position.addScaledVector(move,speed*dt);walkTime+=dt*10;player.rotation.y=yaw;leftLeg.rotation.x=Math.sin(walkTime)*.55;rightLeg.rotation.x=-Math.sin(walkTime)*.55;leftArm.rotation.x=-Math.sin(walkTime)*.25;rightArm.rotation.x=Math.sin(walkTime)*.18;}else{leftLeg.rotation.x*=.8;rightLeg.rotation.x*=.8;leftArm.rotation.x*=.8;rightArm.rotation.x*=.8;}
+    const moving=move.lengthSq()>0;if(moving){move.normalize();const speed=keys.ShiftLeft?12:8;player.position.addScaledVector(move,speed*dt);walkTime+=dt*10;player.rotation.y=yaw;legs[0].rotation.x=Math.sin(walkTime)*.48;legs[1].rotation.x=-Math.sin(walkTime)*.48;arms[0].rotation.x=1.02-Math.sin(walkTime)*.07;arms[1].rotation.x=1.02+Math.sin(walkTime)*.07;}else{legs[0].rotation.x*=.82;legs[1].rotation.x*=.82;arms[0].rotation.x+=(1.02-arms[0].rotation.x)*.18;arms[1].rotation.x+=(1.02-arms[1].rotation.x)*.18;}
     player.position.x=THREE.MathUtils.clamp(player.position.x,-58,58);player.position.z=THREE.MathUtils.clamp(player.position.z,-112,112);
     velocityY-=20*dt;player.position.y+=velocityY*dt;if(player.position.y<=0){player.position.y=0;velocityY=0;onGround=true;}
     // Third-person shoulder camera: follows behind and slightly above the soldier.
