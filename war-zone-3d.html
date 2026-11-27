@@ -33,10 +33,10 @@
 <div id="game"></div>
 <div id="top">
  <div class="panel"><div class="logo">WAR <span>ZONE</span> 3D</div><div class="small">THIRD-PERSON COMBAT TEST · DEVELOPMENT BUILD</div></div>
- <div id="stats" class="panel"><div>ELIMINATIONS<br><b id="kills">0</b></div><div>AMMO<br><b id="ammo">30 / ∞</b></div></div>
+ <div id="stats" class="panel"><div>ELIMINATIONS<br><b id="kills">0</b></div><div>AMMO<br><b id="ammo">30 / 120</b></div></div>
 </div>
 <div id="crosshair"></div>
-<div id="bottom"><div id="hint">WASD move · Mouse look · Click shoot · Shift sprint · Space jump · Esc unlock mouse</div><div id="health"><i></i></div><a id="back" href="index.html">← BACK TO CLASSIC WAR ZONE</a></div>
+<div id="bottom"><div id="hint">WASD move · Mouse look · Left click shoot · Right click aim · R reload · Shift sprint · Space jump · Esc unlock</div><div id="health"><i></i></div><a id="back" href="index.html">← BACK TO CLASSIC WAR ZONE</a></div>
 <div id="toast"></div>
 <div id="loading"><div><b>WAR ZONE 3D</b><p>Building the 3D battlefield…</p></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -168,20 +168,20 @@
     g.userData={hp:100,alive:true,respawn:0};targets.push(g);
   }
   [[-8,-18],[8,-32],[-9,12],[10,52],[0,-65]].forEach(p=>spawnTarget(p[0],p[1]));
-  let yaw=0,pitch=.22,velocityY=0,onGround=true,kills=0,ammo=30,lastShot=0,recoil=0;
+  let yaw=0,pitch=.22,velocityY=0,onGround=true,kills=0,ammo=30,reserveAmmo=120,lastShot=0,recoil=0,reloading=false,reloadUntil=0,aiming=false,landingBounce=0;
   const keys={};let locked=false,moveSpeed=8,walkTime=0;
   const toast=(s)=>{toastEl.textContent=s;toastEl.classList.add('show');setTimeout(()=>toastEl.classList.remove('show'),1400);};
   renderer.domElement.addEventListener('click',()=>{if(!locked)renderer.domElement.requestPointerLock();});
   document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===renderer.domElement;});
   document.addEventListener('mousemove',e=>{if(!locked)return;yaw-=e.movementX*.0025;pitch=Math.max(-.15,Math.min(.65,pitch+e.movementY*.0018));});
-  document.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space'&&onGround){velocityY=8.3;onGround=false;}});
+  document.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space'&&onGround){velocityY=8.3;onGround=false;}if(e.code==='KeyR'&&!reloading&&ammo<30&&reserveAmmo>0){reloading=true;reloadUntil=performance.now()+1350;firing=false;toast('RELOADING…');}});
   document.addEventListener('keyup',e=>keys[e.code]=false);
   document.addEventListener('contextmenu',e=>e.preventDefault());
-  let firing=false;document.addEventListener('mousedown',e=>{if(e.button===0&&locked)firing=true;});document.addEventListener('mouseup',()=>firing=false);
+  let firing=false;document.addEventListener('mousedown',e=>{if(e.button===0&&locked)firing=true;if(e.button===2&&locked)aiming=true;});document.addEventListener('mouseup',e=>{if(e.button===0)firing=false;if(e.button===2)aiming=false;});
   function shoot(now){
-    if(!locked||ammo<=0||now-lastShot<115)return;lastShot=now;ammo--;document.getElementById('ammo').textContent=ammo+' / ∞';
-    muzzle.visible=true;setTimeout(()=>muzzle.visible=false,55);recoil=.09;
-    const origin=new THREE.Vector3(player.position.x,1.65,player.position.z);
+    if(!locked||reloading||ammo<=0||now-lastShot<115)return;if(ammo<=0){toast('PRESS R TO RELOAD');return;}lastShot=now;ammo--;document.getElementById('ammo').textContent=ammo+' / '+reserveAmmo;
+    muzzle.visible=true;setTimeout(()=>muzzle.visible=false,55);recoil=.09;arms[0].rotation.x+=.035;arms[1].rotation.x+=.045;
+    const origin=new THREE.Vector3();muzzle.getWorldPosition(origin);
     const dir=new THREE.Vector3(-Math.sin(yaw),Math.sin(pitch),-Math.cos(yaw)).normalize();
     const ray=new THREE.Raycaster(origin,dir,0,90);const hit=ray.intersectObjects(targets.filter(t=>t.userData.alive).flatMap(t=>t.children),false);
     const end=hit.length?hit[0].point:origin.clone().add(dir.clone().multiplyScalar(65));
@@ -194,14 +194,15 @@
     if(firing)shoot(now);
     const forward=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw)),right=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
     let move=new THREE.Vector3();if(keys.KeyW||keys.ArrowUp)move.add(forward);if(keys.KeyS||keys.ArrowDown)move.sub(forward);if(keys.KeyD||keys.ArrowRight)move.add(right);if(keys.KeyA||keys.ArrowLeft)move.sub(right);
-    const moving=move.lengthSq()>0;if(moving){move.normalize();const speed=keys.ShiftLeft?12:8;player.position.addScaledVector(move,speed*dt);walkTime+=dt*10;player.rotation.y=yaw;legs[0].rotation.x=Math.sin(walkTime)*.48;legs[1].rotation.x=-Math.sin(walkTime)*.48;arms[0].rotation.x=1.02-Math.sin(walkTime)*.07;arms[1].rotation.x=1.02+Math.sin(walkTime)*.07;}else{legs[0].rotation.x*=.82;legs[1].rotation.x*=.82;arms[0].rotation.x+=(1.02-arms[0].rotation.x)*.18;arms[1].rotation.x+=(1.02-arms[1].rotation.x)*.18;}
+    const moving=move.lengthSq()>0;const sprinting=!!keys.ShiftLeft&&moving;player.rotation.y=yaw;if(moving){move.normalize();const speed=sprinting?12:8;player.position.addScaledVector(move,speed*dt);walkTime+=dt*(sprinting?15:10);legs[0].rotation.x=Math.sin(walkTime)*(sprinting?.72:.48);legs[1].rotation.x=-Math.sin(walkTime)*(sprinting?.72:.48);arms[0].rotation.x=1.02-Math.sin(walkTime)*.035;arms[1].rotation.x=1.02+Math.sin(walkTime)*.035;}else{legs[0].rotation.x*=.82;legs[1].rotation.x*=.82;arms[0].rotation.x+=(1.02-arms[0].rotation.x)*.18;arms[1].rotation.x+=(1.02-arms[1].rotation.x)*.18;}
+    if(reloading&&now>=reloadUntil){const needed=30-ammo,loaded=Math.min(needed,reserveAmmo);ammo+=loaded;reserveAmmo-=loaded;reloading=false;document.getElementById('ammo').textContent=ammo+' / '+reserveAmmo;toast('RELOAD COMPLETE');}
     player.position.x=THREE.MathUtils.clamp(player.position.x,-58,58);player.position.z=THREE.MathUtils.clamp(player.position.z,-112,112);
-    velocityY-=20*dt;player.position.y+=velocityY*dt;if(player.position.y<=0){player.position.y=0;velocityY=0;onGround=true;}
+    const wasAirborne=!onGround;velocityY-=20*dt;player.position.y+=velocityY*dt;if(player.position.y<=0){if(wasAirborne&&velocityY< -2)landingBounce=.12;player.position.y=0;velocityY=0;onGround=true;}else{landingBounce*=.9;}
     // Third-person shoulder camera: follows behind and slightly above the soldier.
     const focus=new THREE.Vector3(player.position.x,1.7+player.position.y,player.position.z);
-    const offset=new THREE.Vector3(4.2,3.0,6.6).applyAxisAngle(new THREE.Vector3(0,1,0),yaw);
+    const offset=new THREE.Vector3(aiming?2.35:4.2,aiming?2.25:3.0,aiming?4.25:6.6).applyAxisAngle(new THREE.Vector3(0,1,0),yaw);
     camera.position.lerp(focus.clone().add(offset),1-Math.pow(.001,dt));camera.lookAt(focus.clone().add(new THREE.Vector3(-Math.sin(yaw)*12,Math.sin(pitch)*10,-Math.cos(yaw)*12)));
-    gun.position.z=-.48-recoil;recoil*=.78;
+    player.position.y+=landingBounce;gun.position.z=-.48-recoil;gun.rotation.x=-recoil*.55;recoil*=.78;
     renderer.render(scene,camera);
   }
   addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));});
