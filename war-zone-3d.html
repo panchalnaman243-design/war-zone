@@ -91,7 +91,8 @@
   }
   // Blast-scarred concrete barriers and sandbag firing positions.
   function sandbag(x,y,z,rot=0){
-    const bag=new THREE.Mesh(new THREE.CapsuleGeometry(.32,.72,4,8),mat(0x777052));
+    const bag=new THREE.Mesh(new THREE.SphereGeometry(.48,12,8),mat(0x777052));
+    bag.scale.set(1,.68,.72);
     bag.rotation.z=Math.PI/2;bag.rotation.y=rot;bag.position.set(x,y,z);bag.castShadow=true;bag.receiveShadow=true;scene.add(bag);
   }
   for(const side of [-1,1]){
