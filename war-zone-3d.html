@@ -79,26 +79,83 @@
   for(let i=0;i<12;i++){const x=(i%2?1:-1)*(15+(i%3)*3);box(x,.9,35+Math.floor(i/2)*8,2.5,1.8,2.5,0x6b604b);}
   // Street lamps
   for(const x of [-12,12])for(let z=-85;z<95;z+=30){const pole= new THREE.Mesh(new THREE.CylinderGeometry(.12,.16,7,8),mat(0x303a3e,.5,.65));pole.position.set(x,3.5,z);pole.castShadow=true;scene.add(pole);box(x,7,z,.9,.16,.35,0xb8c6c2);}
-  // Player model assembled from procedural meshes; later milestone swaps in rigged GLB.
+  // Step 1: detailed modern military soldier built from layered procedural meshes.
+  // Kept self-contained so this upgrade does not touch accounts, saves, or multiplayer.
   const player=new THREE.Group();scene.add(player);
-  const bodyMat=mat(0x18252d,.72,.12), vestMat=mat(0x283b43,.7,.1), pantsMat=mat(0x101a20), skinMat=mat(0xb98768), bootMat=mat(0x090e12,.55);
-  function limb(parent,geo,material,x,y,z){const o=new THREE.Mesh(geo,material);o.position.set(x,y,z);o.castShadow=true;parent.add(o);return o;}
-  const torso=limb(player,new THREE.CylinderGeometry(.48,.48,1.3,14),bodyMat,0,1.55,0);
-  limb(player,new THREE.BoxGeometry(.83,.78,.42),vestMat,0,1.58,-.03);
-  const head=limb(player,new THREE.SphereGeometry(.29,18,14),skinMat,0,2.43,0);
-  limb(player,new THREE.SphereGeometry(.31,16,10),mat(0x182128),0,2.58,-.02);
-  const leftLeg=limb(player,new THREE.CylinderGeometry(.17,.17,.9,10),pantsMat,-.23,.55,0);
-  const rightLeg=limb(player,new THREE.CapsuleGeometry(.17,.66,4,8),pantsMat,.23,.55,0);
-  const leftArm=limb(player,new THREE.CylinderGeometry(.13,.13,.8,10),bodyMat,-.58,1.62,-.04);
-  const rightArm=limb(player,new THREE.CapsuleGeometry(.13,.58,4,8),bodyMat,.58,1.62,-.04);
-  limb(player,new THREE.BoxGeometry(.26,.13,.4),bootMat,-.23,.13,.08);limb(player,new THREE.BoxGeometry(.26,.13,.4),bootMat,.23,.13,.08);
-  // Rifle: stock, receiver, barrel, grip and sight
-  const gun=new THREE.Group();player.add(gun);gun.position.set(.38,1.65,-.48);
-  limb(gun,new THREE.BoxGeometry(.19,.2,1.0),mat(0x20282c,.4,.7),0,0,0);
-  limb(gun,new THREE.CylinderGeometry(.045,.045,.82,10),mat(0x0d1418,.35,.8),0,.02,-.78).rotation.x=Math.PI/2;
-  limb(gun,new THREE.BoxGeometry(.15,.27,.22),mat(0x101619),0,-.18,-.1);
-  limb(gun,new THREE.BoxGeometry(.07,.12,.12),mat(0x6b777b,.4,.7),0,.15,-.16);
-  const muzzle=new THREE.Mesh(new THREE.SphereGeometry(.12,8,8),new THREE.MeshBasicMaterial({color:0xffc36b}));muzzle.position.set(0,.02,-1.2);muzzle.visible=false;gun.add(muzzle);
+  const uniform=mat(0x202a2b,.92), uniformDark=mat(0x111a1d,.88), plate=mat(0x303b3d,.62,.16);
+  const webbing=mat(0x465044,.9), pouchMat=mat(0x3b453d,.9), skinMat=mat(0x936b55), gloveMat=mat(0x171d1b,.85);
+  const bootMat=mat(0x0b1112,.7), metal=mat(0x171f22,.38,.72), glass=new THREE.MeshStandardMaterial({color:0x101d22,metalness:.7,roughness:.22});
+  function part(parent,geometry,material,x,y,z,rx=0,ry=0,rz=0){
+    const o=new THREE.Mesh(geometry,material);o.position.set(x,y,z);o.rotation.set(rx,ry,rz);o.castShadow=true;o.receiveShadow=true;parent.add(o);return o;
+  }
+  function limbSegment(parent,a,b,r1,r2,material){
+    const A=new THREE.Vector3(...a),B=new THREE.Vector3(...b),v=B.clone().sub(A);
+    const o=part(parent,new THREE.CylinderGeometry(r2,r1,v.length(),12),material,...A.clone().add(B).multiplyScalar(.5).toArray());
+    o.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),v.normalize());return o;
+  }
+  // Torso, layered plate carrier and tactical webbing
+  part(player,new THREE.CylinderGeometry(.38,.43,.92,16),uniform,0,1.52,0);
+  part(player,new THREE.BoxGeometry(.78,.68,.34),plate,0,1.57,-.045);
+  part(player,new THREE.BoxGeometry(.82,.12,.38),webbing,0,1.92,-.035);
+  part(player,new THREE.BoxGeometry(.82,.12,.38),webbing,0,1.22,-.025);
+  part(player,new THREE.BoxGeometry(.22,.4,.08),uniformDark,0,1.57,.18);
+  for(let side of [-1,1]){
+    part(player,new THREE.BoxGeometry(.22,.25,.18),pouchMat,side*.29,1.38,-.24);
+    part(player,new THREE.BoxGeometry(.18,.22,.17),pouchMat,side*.29,1.67,-.24);
+    part(player,new THREE.BoxGeometry(.24,.18,.3),plate,side*.47,1.72,0);
+    part(player,new THREE.BoxGeometry(.2,.22,.16),uniformDark,side*.39,1.03,0);
+  }
+  // Neck, face covering, helmet shell, rails, goggles and headset
+  part(player,new THREE.CylinderGeometry(.13,.14,.18,12),skinMat,0,2.04,0);
+  part(player,new THREE.SphereGeometry(.255,20,16),skinMat,0,2.28,0);
+  part(player,new THREE.SphereGeometry(.26,20,12,0,Math.PI*2,0,Math.PI*.55),uniformDark,0,2.32,0);
+  part(player,new THREE.BoxGeometry(.36,.15,.24),uniformDark,0,2.18,-.12);
+  part(player,new THREE.BoxGeometry(.43,.11,.12),plate,0,2.34,-.2);
+  part(player,new THREE.BoxGeometry(.42,.10,.12),glass,0,2.39,-.205);
+  for(let side of [-1,1]){
+    part(player,new THREE.CylinderGeometry(.055,.055,.07,12),plate,side*.27,2.29,0,0,0,Math.PI/2);
+    part(player,new THREE.BoxGeometry(.07,.18,.08),uniformDark,side*.24,2.22,-.02);
+    part(player,new THREE.BoxGeometry(.045,.12,.34),plate,side*.2,2.48,0);
+  }
+  part(player,new THREE.BoxGeometry(.25,.12,.2),uniformDark,0,2.51,.02);
+  // Backpack, straps and radio antenna
+  part(player,new THREE.BoxGeometry(.48,.65,.24),webbing,0,1.61,.27);
+  part(player,new THREE.BoxGeometry(.14,.52,.08),pouchMat,-.23,1.6,.12,0,0,-.12);
+  part(player,new THREE.BoxGeometry(.14,.52,.08),pouchMat,.23,1.6,.12,0,0,.12);
+  part(player,new THREE.CylinderGeometry(.012,.012,.58,6),metal,.31,2.05,.28,0,0,-.12);
+  // Articulated legs with knee pads, boots and ankle gaiters
+  const legs=[];
+  for(const side of [-1,1]){
+    const hip=new THREE.Group();hip.position.set(side*.22,1.08,0);player.add(hip);legs.push(hip);
+    part(hip,new THREE.CylinderGeometry(.17,.145,.62,12),uniform,0,-.31,0);
+    part(hip,new THREE.BoxGeometry(.25,.2,.11),plate,0,-.48,-.105);
+    part(hip,new THREE.CylinderGeometry(.13,.12,.34,12),uniformDark,0,-.76,0);
+    part(hip,new THREE.BoxGeometry(.27,.18,.43),bootMat,0,-.94,-.105);
+    part(hip,new THREE.BoxGeometry(.28,.07,.42),metal,0,-1.025,-.105);
+  }
+  // Shoulder/arm joints are grouped for a stable rifle-ready pose and walk animation
+  const arms=[];
+  for(const side of [-1,1]){
+    const shoulder=new THREE.Group();shoulder.position.set(side*.48,1.83,-.015);player.add(shoulder);arms.push(shoulder);
+    part(shoulder,new THREE.SphereGeometry(.19,14,12),plate,0,0,0);
+    part(shoulder,new THREE.CylinderGeometry(.13,.145,.54,12),uniform,0,-.29,-.015,0,0,side*.12);
+    part(shoulder,new THREE.SphereGeometry(.12,12,10),plate,0,-.55,-.02);
+    part(shoulder,new THREE.CylinderGeometry(.105,.11,.35,12),uniformDark,0,-.76,-.04);
+    part(shoulder,new THREE.SphereGeometry(.105,12,10),gloveMat,0,-.96,-.08);
+    part(shoulder,new THREE.BoxGeometry(.17,.11,.17),gloveMat,0,-.99,-.15);
+  }
+  // Detailed rifle with handguard, sights, magazine, stock and muzzle device
+  const gun=new THREE.Group();player.add(gun);gun.position.set(.34,1.48,-.58);
+  part(gun,new THREE.BoxGeometry(.16,.18,.68),metal,0,0,0);
+  part(gun,new THREE.BoxGeometry(.19,.12,.48),plate,0,.035,-.12);
+  part(gun,new THREE.CylinderGeometry(.035,.035,.76,12),metal,0,.025,-.66,Math.PI/2,0,0);
+  part(gun,new THREE.CylinderGeometry(.055,.055,.12,10),plate,0,.025,-1.04,Math.PI/2,0,0);
+  part(gun,new THREE.BoxGeometry(.12,.3,.2),uniformDark,0,-.2,-.08,.22,0,0);
+  part(gun,new THREE.BoxGeometry(.12,.32,.2),uniformDark,0,-.23,.24,-.12,0,0);
+  part(gun,new THREE.BoxGeometry(.07,.12,.16),glass,0,.14,-.18);
+  part(gun,new THREE.BoxGeometry(.08,.07,.22),metal,0,.13,-.18);
+  part(gun,new THREE.BoxGeometry(.09,.08,.24),metal,0,.13,-.62);
+  const muzzle=new THREE.Mesh(new THREE.SphereGeometry(.12,8,8),new THREE.MeshBasicMaterial({color:0xffc36b}));muzzle.position.set(0,.025,-1.08);muzzle.visible=false;gun.add(muzzle);
   // Target dummies for the first playable 3D test.
   const targets=[];
   function spawnTarget(x,z){
