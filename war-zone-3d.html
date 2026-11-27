@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self';">
+<title>WAR ZONE 3D — Prototype</title>
+<style>
+:root{color-scheme:dark;--green:#27e38b;--cyan:#25d9ff;--bg:#061018}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:Arial, sans-serif;color:#eaf7fb}
+#game{position:fixed;inset:0}canvas{display:block}
+#top{position:fixed;z-index:3;top:14px;left:14px;right:14px;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none}
+.panel{background:#07151de8;border:1px solid #244452;border-radius:12px;padding:10px 14px;box-shadow:0 8px 28px #0008;pointer-events:auto}
+.logo{font-weight:1000;letter-spacing:3px}.logo span{color:var(--green)}
+.small{font-size:11px;color:#a7c0cb;margin-top:4px}
+#stats{display:flex;gap:8px}#stats b{color:var(--green)}
+#crosshair{position:fixed;z-index:2;left:50%;top:50%;width:24px;height:24px;transform:translate(-50%,-50%);pointer-events:none}
+#crosshair:before,#crosshair:after{content:"";position:absolute;background:#d9fbff;box-shadow:0 0 7px #25d9ff}
+#crosshair:before{width:2px;height:24px;left:11px;top:0}#crosshair:after{height:2px;width:24px;left:0;top:11px}
+#bottom{position:fixed;z-index:3;bottom:14px;left:50%;transform:translateX(-50%);text-align:center;width:min(94vw,650px);pointer-events:none}
+#hint{display:inline-block;background:#07151de8;border:1px solid #244452;border-radius:10px;padding:9px 14px;font-size:12px;color:#d2e6ec}
+#health{height:9px;width:190px;background:#182b32;border-radius:9px;overflow:hidden;margin:8px auto 0;border:1px solid #52717d}
+#health i{display:block;width:100%;height:100%;background:linear-gradient(90deg,#16b96c,#27e38b)}
+#back{color:#eaf7fb;text-decoration:none;font-size:12px;font-weight:bold;border:1px solid #31515d;border-radius:9px;padding:9px 12px;display:inline-block;margin-top:8px;background:#10242d}
+#toast{position:fixed;z-index:4;top:90px;left:50%;transform:translateX(-50%);padding:9px 14px;border-radius:9px;background:#10242d;border:1px solid #25d9ff;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.show{opacity:1}
+#loading{position:fixed;z-index:10;inset:0;background:#061018;display:grid;place-items:center;text-align:center}
+#loading b{font-size:24px;letter-spacing:4px;color:var(--green)}#loading p{color:#a7c0cb;font-size:13px}
+@media(max-width:650px){#stats{display:none}.panel{padding:8px 10px}.small{max-width:210px}#hint{font-size:10px}}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="top">
+ <div class="panel"><div class="logo">WAR <span>ZONE</span> 3D</div><div class="small">THIRD-PERSON COMBAT TEST · DEVELOPMENT BUILD</div></div>
+ <div id="stats" class="panel"><div>ELIMINATIONS<br><b id="kills">0</b></div><div>AMMO<br><b id="ammo">30 / ∞</b></div></div>
+</div>
+<div id="crosshair"></div>
+<div id="bottom"><div id="hint">WASD move · Mouse look · Click shoot · Shift sprint · Space jump · Esc unlock mouse</div><div id="health"><i></i></div><a id="back" href="index.html">← BACK TO CLASSIC WAR ZONE</a></div>
+<div id="toast"></div>
+<div id="loading"><div><b>WAR ZONE 3D</b><p>Building the 3D battlefield…</p></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+  const loading=document.getElementById('loading'), toastEl=document.getElementById('toast');
+  if(!window.THREE){loading.innerHTML='<div><b>3D ENGINE DID NOT LOAD</b><p>Check your internet connection and reload this page.</p><a id="back" href="index.html">Back to WAR ZONE</a></div>';return;}
+  const scene=new THREE.Scene(); scene.background=new THREE.Color(0x91b5c5); scene.fog=new THREE.Fog(0x91b5c5,65,230);
+  const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,500);
+  const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,1.7)); renderer.setSize(innerWidth,innerHeight);
+  renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer.outputEncoding=THREE.sRGBEncoding; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.05;
+  document.getElementById('game').appendChild(renderer.domElement);
+  scene.add(new THREE.HemisphereLight(0xc9e7ff,0x34402c,1.25));
+  const sun=new THREE.DirectionalLight(0xffedcf,2.0);sun.position.set(-35,65,28);sun.castShadow=true;
+  sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-85;sun.shadow.camera.right=85;sun.shadow.camera.top=85;sun.shadow.camera.bottom=-85;scene.add(sun);
+  const mat=(color,roughness=.8,metalness=0)=>new THREE.MeshStandardMaterial({color,roughness,metalness});
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(260,260),mat(0x56675b));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+  const grid=new THREE.GridHelper(260,52,0x536e70,0x536e70);grid.position.y=.015;grid.material.transparent=true;grid.material.opacity=.13;scene.add(grid);
+  // Road and lane markings
+  const road=new THREE.Mesh(new THREE.PlaneGeometry(22,230),mat(0x252d32));road.rotation.x=-Math.PI/2;road.position.set(0,.025,0);road.receiveShadow=true;scene.add(road);
+  for(let z=-105;z<115;z+=12){const stripe=new THREE.Mesh(new THREE.PlaneGeometry(.28,5),mat(0xd8d0a4));stripe.rotation.x=-Math.PI/2;stripe.position.set(0,.045,z);scene.add(stripe);}
+  // City blocks, walls and cover
+  const buildings=[];
+  function building(x,z,w,h,d,color){
+    const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color,.88));mesh.position.set(x,h/2,z);mesh.castShadow=true;mesh.receiveShadow=true;scene.add(mesh);buildings.push(mesh);
+    const roof=new THREE.Mesh(new THREE.BoxGeometry(w+.15,.25,d+.15),mat(0x303b40));roof.position.set(x,h+.12,z);roof.castShadow=true;scene.add(roof);
+    for(let y=2.4;y<h-1;y+=3.2)for(let xx=-w/2+1.5;xx<w/2-1;xx+=3.2){
+      const win=new THREE.Mesh(new THREE.PlaneGeometry(1.15,1.4),new THREE.MeshStandardMaterial({color:0x91c8d4,emissive:0x182f39,roughness:.35,metalness:.15}));
+      win.position.set(x+xx,y,z-d/2-.012);scene.add(win);
+    }
+  }
+  building(-23,-24,17,17,18,0x747d80);building(25,-38,19,24,20,0x68777b);
+  building(-27,25,18,13,20,0x8b8173);building(28,28,20,19,18,0x777b73);
+  building(-48,-5,13,11,17,0x737d82);building(48,8,15,15,19,0x8b8177);
+  // Barriers and crates
+  function box(x,y,z,w,h,d,color){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;scene.add(m);return m;}
+  for(let i=0;i<18;i++){const side=i%2?1:-1;box(side*(10+(i%3)*2),.8,-82+i*9,3,1.6,2.2,i%2?0x6c5940:0x4e5c60);}
+  for(let i=0;i<12;i++){const x=(i%2?1:-1)*(15+(i%3)*3);box(x,.9,35+Math.floor(i/2)*8,2.5,1.8,2.5,0x6b604b);}
+  // Street lamps
+  for(const x of [-12,12])for(let z=-85;z<95;z+=30){const pole= new THREE.Mesh(new THREE.CylinderGeometry(.12,.16,7,8),mat(0x303a3e,.5,.65));pole.position.set(x,3.5,z);pole.castShadow=true;scene.add(pole);box(x,7,z,.9,.16,.35,0xb8c6c2);}
+  // Player model assembled from procedural meshes; later milestone swaps in rigged GLB.
+  const player=new THREE.Group();scene.add(player);
+  const bodyMat=mat(0x18252d,.72,.12), vestMat=mat(0x283b43,.7,.1), pantsMat=mat(0x101a20), skinMat=mat(0xb98768), bootMat=mat(0x090e12,.55);
+  function limb(parent,geo,material,x,y,z){const o=new THREE.Mesh(geo,material);o.position.set(x,y,z);o.castShadow=true;parent.add(o);return o;}
+  const torso=limb(player,new THREE.CapsuleGeometry(.48,.82,5,10),bodyMat,0,1.55,0);
+  limb(player,new THREE.BoxGeometry(.83,.78,.42),vestMat,0,1.58,-.03);
+  const head=limb(player,new THREE.SphereGeometry(.29,18,14),skinMat,0,2.43,0);
+  limb(player,new THREE.SphereGeometry(.31,16,10),mat(0x182128),0,2.58,-.02);
+  const leftLeg=limb(player,new THREE.CapsuleGeometry(.17,.66,4,8),pantsMat,-.23,.55,0);
+  const rightLeg=limb(player,new THREE.CapsuleGeometry(.17,.66,4,8),pantsMat,.23,.55,0);
+  const leftArm=limb(player,new THREE.CapsuleGeometry(.13,.58,4,8),bodyMat,-.58,1.62,-.04);
+  const rightArm=limb(player,new THREE.CapsuleGeometry(.13,.58,4,8),bodyMat,.58,1.62,-.04);
+  limb(player,new THREE.BoxGeometry(.26,.13,.4),bootMat,-.23,.13,.08);limb(player,new THREE.BoxGeometry(.26,.13,.4),bootMat,.23,.13,.08);
+  // Rifle: stock, receiver, barrel, grip and sight
+  const gun=new THREE.Group();player.add(gun);gun.position.set(.38,1.65,-.48);
+  limb(gun,new THREE.BoxGeometry(.19,.2,1.0),mat(0x20282c,.4,.7),0,0,0);
+  limb(gun,new THREE.CylinderGeometry(.045,.045,.82,10),mat(0x0d1418,.35,.8),0,.02,-.78).rotation.x=Math.PI/2;
+  limb(gun,new THREE.BoxGeometry(.15,.27,.22),mat(0x101619),0,-.18,-.1);
+  limb(gun,new THREE.BoxGeometry(.07,.12,.12),mat(0x6b777b,.4,.7),0,.15,-.16);
+  const muzzle=new THREE.Mesh(new THREE.SphereGeometry(.12,8,8),new THREE.MeshBasicMaterial({color:0xffc36b}));muzzle.position.set(0,.02,-1.2);muzzle.visible=false;gun.add(muzzle);
+  // Target dummies for the first playable 3D test.
+  const targets=[];
+  function spawnTarget(x,z){
+    const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);
+    const red=mat(0x843d38), dark=mat(0x262d31), targetHead=mat(0xb47b62);
+    const torso= new THREE.Mesh(new THREE.CapsuleGeometry(.43,.75,4,9),red);torso.position.y=1.45;torso.castShadow=true;g.add(torso);
+    const h=new THREE.Mesh(new THREE.SphereGeometry(.25,12,10),targetHead);h.position.y=2.35;h.castShadow=true;g.add(h);
+    const l=new THREE.Mesh(new THREE.BoxGeometry(.2,.75,.2),dark);l.position.set(-.22,.42,0);g.add(l);
+    const r=l.clone();r.position.x=.22;g.add(r);
+    g.userData={hp:100,alive:true,respawn:0};targets.push(g);
+  }
+  [[-8,-18],[8,-32],[-9,12],[10,52],[0,-65]].forEach(p=>spawnTarget(p[0],p[1]));
+  let yaw=0,pitch=.22,velocityY=0,onGround=true,kills=0,ammo=30,lastShot=0,recoil=0;
+  const keys={};let locked=false,moveSpeed=8,walkTime=0;
+  const toast=(s)=>{toastEl.textContent=s;toastEl.classList.add('show');setTimeout(()=>toastEl.classList.remove('show'),1400);};
+  renderer.domElement.addEventListener('click',()=>{if(!locked)renderer.domElement.requestPointerLock();});
+  document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===renderer.domElement;});
+  document.addEventListener('mousemove',e=>{if(!locked)return;yaw-=e.movementX*.0025;pitch=Math.max(-.15,Math.min(.65,pitch+e.movementY*.0018));});
+  document.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space'&&onGround){velocityY=8.3;onGround=false;}});
+  document.addEventListener('keyup',e=>keys[e.code]=false);
+  document.addEventListener('contextmenu',e=>e.preventDefault());
+  let firing=false;document.addEventListener('mousedown',e=>{if(e.button===0&&locked)firing=true;});document.addEventListener('mouseup',()=>firing=false);
+  function shoot(now){
+    if(!locked||ammo<=0||now-lastShot<115)return;lastShot=now;ammo--;document.getElementById('ammo').textContent=ammo+' / ∞';
+    muzzle.visible=true;setTimeout(()=>muzzle.visible=false,55);recoil=.09;
+    const origin=new THREE.Vector3(player.position.x,1.65,player.position.z);
+    const dir=new THREE.Vector3(-Math.sin(yaw),Math.sin(pitch),-Math.cos(yaw)).normalize();
+    const ray=new THREE.Raycaster(origin,dir,0,90);const hit=ray.intersectObjects(targets.filter(t=>t.userData.alive).flatMap(t=>t.children),false);
+    const end=hit.length?hit[0].point:origin.clone().add(dir.clone().multiplyScalar(65));
+    const points=[origin,end],geo=new THREE.BufferGeometry().setFromPoints(points),line=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xffd28a,transparent:true,opacity:.9}));scene.add(line);setTimeout(()=>{scene.remove(line);geo.dispose();},65);
+    if(hit.length){let target=hit[0].object;while(target.parent&&!target.userData.hp)target=target.parent;if(target.userData.hp){target.userData.hp-=34;if(target.userData.hp<=0){target.userData.alive=false;target.visible=false;kills++;document.getElementById('kills').textContent=kills;toast('TARGET ELIMINATED');setTimeout(()=>{target.userData.hp=100;target.userData.alive=true;target.visible=true;},2200);}else toast('HIT CONFIRMED');}}
+  }
+  const clock=new THREE.Clock();
+  function animate(){
+    requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.04),now=performance.now();
+    if(firing)shoot(now);
+    const forward=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw)),right=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
+    let move=new THREE.Vector3();if(keys.KeyW||keys.ArrowUp)move.add(forward);if(keys.KeyS||keys.ArrowDown)move.sub(forward);if(keys.KeyD||keys.ArrowRight)move.add(right);if(keys.KeyA||keys.ArrowLeft)move.sub(right);
+    const moving=move.lengthSq()>0;if(moving){move.normalize();const speed=keys.ShiftLeft?12:8;player.position.addScaledVector(move,speed*dt);walkTime+=dt*10;player.rotation.y=yaw;leftLeg.rotation.x=Math.sin(walkTime)*.55;rightLeg.rotation.x=-Math.sin(walkTime)*.55;leftArm.rotation.x=-Math.sin(walkTime)*.25;rightArm.rotation.x=Math.sin(walkTime)*.18;}else{leftLeg.rotation.x*=.8;rightLeg.rotation.x*=.8;leftArm.rotation.x*=.8;rightArm.rotation.x*=.8;}
+    player.position.x=THREE.MathUtils.clamp(player.position.x,-58,58);player.position.z=THREE.MathUtils.clamp(player.position.z,-112,112);
+    velocityY-=20*dt;player.position.y+=velocityY*dt;if(player.position.y<=0){player.position.y=0;velocityY=0;onGround=true;}
+    // Third-person shoulder camera: follows behind and slightly above the soldier.
+    const focus=new THREE.Vector3(player.position.x,1.7+player.position.y,player.position.z);
+    const offset=new THREE.Vector3(4.2,3.0,6.6).applyAxisAngle(new THREE.Vector3(0,1,0),yaw);
+    camera.position.lerp(focus.clone().add(offset),1-Math.pow(.001,dt));camera.lookAt(focus.clone().add(new THREE.Vector3(-Math.sin(yaw)*12,Math.sin(pitch)*10,-Math.cos(yaw)*12)));
+    gun.position.z=-.48-recoil;recoil*=.78;
+    renderer.render(scene,camera);
+  }
+  addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));});
+  animate();loading.style.display='none';toast('3D TEST READY — click the battlefield to play');
+})();
+</script>
+</body>
+</html>
