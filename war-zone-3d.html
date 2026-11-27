@@ -112,7 +112,6 @@
     const windshield=new THREE.Mesh(new THREE.PlaneGeometry(2.1,.72),glassMat);
     windshield.position.set(0,2.12,-1.51);v.add(windshield);
     const dent=new THREE.Mesh(new THREE.BoxGeometry(1.2,.18,1.5),mat(0x252d2b));dent.position.set(.55,2.62,.4);dent.rotation.z=-.22;v.add(dent);
-    box(x,0,z,.01,.01,.01,0x41483e);
   }
   wreckedVehicle(-15,-55,-.18);wreckedVehicle(16,76,Math.PI+.2);
   // Burnt-out civilian car near the far intersection.
